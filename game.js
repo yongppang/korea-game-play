@@ -3032,7 +3032,7 @@
   function dirVec() {
     var vx = 0, vy = 0;
     held.forEach(function (k) { var d = held.dirs[k]; if (d) { vx += d[0]; vy += d[1]; } });
-    if (padDir) { vx += padDir[0]; vy += padDir[1]; }
+    if (padDir && !SCN) { vx += padDir[0]; vy += padDir[1]; }
     var l = Math.sqrt(vx * vx + vy * vy); return l ? [vx / l, vy / l] : null;
   }
   /* 타일 중앙까지 완전히 들어오면 마을/내 집 자동 입장 */
@@ -3089,12 +3089,28 @@
     me.wasMoving = moving;
   }
   setInterval(moveTick, 16);
-  document.querySelectorAll('#dpad button[data-d]').forEach(function (b) {
-    var dd = b.getAttribute('data-d').split(',').map(Number);
-    b.addEventListener('pointerdown', function (e) { e.preventDefault(); b.setPointerCapture(e.pointerId); padDir = dd; moveTick(); });
-    var up = function () { padDir = null; };
-    b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('lostpointercapture', up);
-  });
+  /* 8방향 패드: 패드 가운데를 기준으로 손가락 방향을 8방향으로 맞춘다. 누른 채 밀면 방향이 바로 바뀐다 */
+  (function () {
+    var pad = $('dpad'), pid = null, PADD = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
+    function padSet(e) {
+      var r = pad.getBoundingClientRect(), dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+      if (dx * dx + dy * dy < 100) return;   /* 가운데 10px 안은 그대로 */
+      var i = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)); i = (i + 8) % 8; var dd = PADD[i];
+      if (padDir && padDir[0] === dd[0] && padDir[1] === dd[1]) return;
+      padDir = dd; padMark(); moveTick();
+    }
+    function padMark() {
+      pad.querySelectorAll('button[data-d]').forEach(function (b) { b.classList.toggle('on', !!padDir && b.getAttribute('data-d') === padDir[0] + ',' + padDir[1]); });
+    }
+    function padUp(e) { if (pid !== e.pointerId) return; pid = null; padDir = null; padMark(); }
+    pad.addEventListener('pointerdown', function (e) {
+      if (e.target.closest && e.target.closest('#ferryBtn, #padPlace')) return;
+      e.preventDefault(); pid = e.pointerId; try { pad.setPointerCapture(e.pointerId); } catch (x) {} padSet(e);
+    });
+    pad.addEventListener('pointermove', function (e) { if (pid === e.pointerId) padSet(e); });
+    pad.addEventListener('pointerup', padUp); pad.addEventListener('pointercancel', padUp); pad.addEventListener('lostpointercapture', padUp);
+    pad.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  })();
   $('ferryBtn').addEventListener('click', function () { setFerry(!ferryArmed); if (ferryArmed) toast('다음 바다 이동에서 배를 탑니다'); });
   $('roadBtn').addEventListener('click', function () { if (!me) { toast('먼저 접속하세요'); return; } setRoadMode(!roadMode); canvas.focus({ preventScroll: true }); });
   $('actBtn').addEventListener('click', function () { if (lastOpts[0]) runOption(lastOpts[0].id); });
@@ -3295,7 +3311,7 @@
   function mapClick(c, p) {
     stopWalk();
     var cell = c.y * GW + c.x; sel = c.id; selCell = { x: c.x, y: c.y }; follow = false;
-    renderSel(); if (me && grid[cell] && cell !== me.cell) walkTo(cell); else if (me && cell === me.cell && !ACT) { walkTarget = cell; VSKIP = -1; me.goal = me.cell; moveTick(); } requestDraw();
+    renderSel(); if (me && cell === me.cell && !ACT) { walkTarget = cell; VSKIP = -1; me.goal = me.cell; moveTick(); } requestDraw();
   }
   $('cmdX').addEventListener('click', closeCmd);
   $('cmdMove').addEventListener('click', function () { if (cmdCell >= 0) { var t0 = cmdCell; closeCmd(); walkTo(t0); canvas.focus({ preventScroll: true }); } });
@@ -6367,19 +6383,34 @@
     if (SCN.k === 'h' && DECO && (DECO.sel === 'move' || (DECO.sel && FURN[DECO.sel]))) { if (ty < 0 || ty >= SCN.map.length || tx < 0 || tx >= SCN.map[0].length) { toast('검은색 영역에는 놓을 수 없어요'); return; } var decoTile = SCN.map[ty].charAt(tx), decoWall = DECO.sel !== 'move' && ['F','W','L'].indexOf(DECO.sel) >= 0; if (!decoWall && decoTile !== '.') { toast('바닥 타일에만 놓을 수 있어요'); return; } decoTap(tx, ty); return; }
     /* 꾸미기 중 가구를 아직 고르지 않았다면 타일 탭은 일반 이동으로 처리 */
     if (SCN.k === 'h' && ch === 'C' && !DECO) { scnWalk(function (x, y) { return Math.abs(x - tx) + Math.abs(y - ty) === 1; }, { k: 'chest' }); return; }
-    if (walkable(tx, ty)) scnWalk(function (x, y) { return x === tx && y === ty; });
   }
   window.addEventListener('keydown', function (e) {
     if (!SCN || typing(e) || e.ctrlKey || e.metaKey || e.altKey) return;
     var k = e.key, d = k === 'ArrowUp' || k === 'w' || k === 'W' ? [0, -1] : k === 'ArrowDown' || k === 's' || k === 'S' ? [0, 1] : k === 'ArrowLeft' || k === 'a' || k === 'A' ? [-1, 0] : k === 'ArrowRight' || k === 'd' || k === 'D' ? [1, 0] : null;
     if (!d) return; e.preventDefault(); e.stopImmediatePropagation(); if (IRIS || SCN.moving) return;
-    if (QMO) closeQM(); var nx = SCN.cx + d[0], ny = SCN.cy + d[1]; if (d[0]) SCN.dir = d[0];
+    scnPadStep(d, true);
+  }, true);
+  /* 장면 안에서 한 칸 걷기. 대각선은 두 방향이 다 열려 있을 때만 (벽 모서리를 뚫지 않게), 아니면 열린 쪽으로 */
+  function scnPadStep(d, touch) {
+    if (QMO) closeQM(); if (d[0]) SCN.dir = d[0];
+    var cx = SCN.cx, cy = SCN.cy, nx = cx + d[0], ny = cy + d[1];
+    if (d[0] && d[1] && !(walkable(nx, ny) && walkable(nx, cy) && walkable(cx, ny))) {
+      if (walkable(nx, cy)) ny = cy; else if (walkable(cx, ny)) nx = cx; else return;
+    }
     if (SCN.k === 'v' && ny >= SCN.map.length) { exitVillage(); return; }
-    if (walkable(nx, ny)) { SCN.pose = null; SCN.poseUntil = 0; SCN.poseFurniture = null; SCN.path = [[nx, ny]]; SCN.goal = [nx, ny]; SCN.moving = true; }
+    if (walkable(nx, ny)) { SCN.pose = null; SCN.poseUntil = 0; SCN.poseFurniture = null; SCN.path = [[nx, ny]]; SCN.goal = [nx, ny]; SCN.moving = true; SCN.act = null; }
+    else if (!touch) return;
     else if (SCN.k === 'v' && houseAt(nx, ny) >= 0) scnArrive({ k: 'house', i: houseAt(nx, ny) });
     else if (SCN.k === 'h' && tAt(nx, ny) === 'C') openStore();
-    else if (SCN.k === 'v' && houseAt(nx, ny) >= 0) scnArrive({ k: 'house', i: houseAt(nx, ny) });
-  }, true);
+  }
+  /* 8방향 패드를 누르고 있는 동안 장면 안에서 계속 걷는다 (막힌 곳에 처음 닿을 때만 집·상자를 연다) */
+  var padScnLast = null;
+  setInterval(function () {
+    if (!padDir) { padScnLast = null; return; }
+    if (!SCN || IRIS || SCN.moving) return;
+    var first = !padScnLast || padScnLast[0] !== padDir[0] || padScnLast[1] !== padDir[1]; padScnLast = padDir;
+    scnPadStep(padDir, first);
+  }, 30);
 
   /* --- 퀵 메뉴 --- */
   /* v125: 낚시점 — 꾸미기와 같은 창에서 낚시대를 산다 */
@@ -6995,7 +7026,7 @@
     toast('임대주택 신청이 완료됐어요! 이제 내집으로 갈 수 있어요');
   }
   function vilTap(p) {
-    for (var i = VHR.length - 1; i >= 0; i--) { var r = VHR[i]; if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) { mapClick({ x: r.c % GW, y: (r.c / GW) | 0, id: grid[r.c] }, p); return true; } }
+    for (var i = VHR.length - 1; i >= 0; i--) { var r = VHR[i]; if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) { if (me && r.c !== me.cell) walkTo(r.c); return true; } }
     return false;
   }
   /* 울타리 그림 (지도 도트 크기) */
@@ -7469,7 +7500,15 @@
   })();
   /* 설정 (왼쪽 위 ⚙): 시간대 · 음악 켜고 끄기 — 낚시점과 같은 창. 원래 오른쪽 아래 버튼(시간·♪)은 숨기고 그 버튼을 대신 누른다 */
   (function () {
-    var b = document.createElement('button'); b.type = 'button'; b.id = 'setBtn'; b.className = 'setbtn'; b.textContent = '⚙ 설정'; document.body.appendChild(b);
+    var b = document.createElement('button'); b.type = 'button'; b.id = 'setBtn'; b.className = 'setbtn'; b.setAttribute('aria-label', '설정'); b.title = '설정';
+    /* 톱니바퀴 (16x16 픽셀): 이 8개 · 가운데 구멍 */
+    var gv = document.createElement('canvas'); gv.width = gv.height = 16; var gc = gv.getContext('2d');
+    for (var gy = 0; gy < 16; gy++) for (var gx = 0; gx < 16; gx++) {
+      var ddx = gx + 0.5 - 8, ddy = gy + 0.5 - 8, rr = Math.sqrt(ddx * ddx + ddy * ddy), an = Math.atan2(ddy, ddx), tooth = Math.cos(an * 8) > 0.25;
+      var out = tooth ? 7.6 : 5.8;
+      if (rr <= out && rr > 2.4) { gc.fillStyle = rr > out - 1.1 || rr < 3.4 ? '#8a6a20' : (ddy < 0 ? '#fff3c4' : '#ffd84a'); gc.fillRect(gx, gy, 1, 1); }
+    }
+    b.appendChild(gv); document.body.appendChild(b);
     b.addEventListener('click', function (e) { e.stopPropagation(); openSetWin(); });
   })();
   function openSetWin() {
