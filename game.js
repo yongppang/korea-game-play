@@ -3089,26 +3089,22 @@
     me.wasMoving = moving;
   }
   setInterval(moveTick, 16);
-  /* 8방향 패드: 패드 가운데를 기준으로 손가락 방향을 8방향으로 맞춘다. 누른 채 밀면 방향이 바로 바뀐다 */
+  /* 조이스틱: 패드 안을 누르고 미는 방향 그대로 걷는다 (어느 각도든). 손잡이가 손가락을 따라 움직인다 */
   (function () {
-    var pad = $('dpad'), pid = null, PADD = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
-    function padSet(e) {
-      var r = pad.getBoundingClientRect(), dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
-      if (dx * dx + dy * dy < 100) return;   /* 가운데 10px 안은 그대로 */
-      var i = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)); i = (i + 8) % 8; var dd = PADD[i];
-      if (padDir && padDir[0] === dd[0] && padDir[1] === dd[1]) return;
-      padDir = dd; padMark(); moveTick();
+    var pad = $('dpad'), pid = null, base = document.createElement('div'), knob = document.createElement('i');
+    base.className = 'joy'; base.appendChild(knob); pad.appendChild(base);
+    function joySet(e) {
+      var r = pad.getBoundingClientRect(), R = r.width / 2, dx = e.clientX - (r.left + R), dy = e.clientY - (r.top + r.height / 2), l = Math.sqrt(dx * dx + dy * dy);
+      var k = l > R * 0.62 ? R * 0.62 / l : 1; knob.style.transform = 'translate(' + (dx * k) + 'px,' + (dy * k) + 'px)';
+      if (l < R * 0.18) { padDir = null; return; }   /* 가운데 조금은 멈춤 */
+      padDir = [dx / l, dy / l]; moveTick();
     }
-    function padMark() {
-      pad.querySelectorAll('button[data-d]').forEach(function (b) { b.classList.toggle('on', !!padDir && b.getAttribute('data-d') === padDir[0] + ',' + padDir[1]); });
-    }
-    function padUp(e) { if (pid !== e.pointerId) return; pid = null; padDir = null; padMark(); }
+    function joyUp(e) { if (pid !== e.pointerId) return; pid = null; padDir = null; knob.style.transform = ''; base.classList.remove('on'); }
     pad.addEventListener('pointerdown', function (e) {
-      if (e.target.closest && e.target.closest('#ferryBtn, #padPlace')) return;
-      e.preventDefault(); pid = e.pointerId; try { pad.setPointerCapture(e.pointerId); } catch (x) {} padSet(e);
+      e.preventDefault(); pid = e.pointerId; try { pad.setPointerCapture(e.pointerId); } catch (x) {} base.classList.add('on'); joySet(e);
     });
-    pad.addEventListener('pointermove', function (e) { if (pid === e.pointerId) padSet(e); });
-    pad.addEventListener('pointerup', padUp); pad.addEventListener('pointercancel', padUp); pad.addEventListener('lostpointercapture', padUp);
+    pad.addEventListener('pointermove', function (e) { if (pid === e.pointerId) joySet(e); });
+    pad.addEventListener('pointerup', joyUp); pad.addEventListener('pointercancel', joyUp); pad.addEventListener('lostpointercapture', joyUp);
     pad.addEventListener('contextmenu', function (e) { e.preventDefault(); });
   })();
   $('ferryBtn').addEventListener('click', function () { setFerry(!ferryArmed); if (ferryArmed) toast('다음 바다 이동에서 배를 탑니다'); });
@@ -6403,13 +6399,14 @@
     else if (SCN.k === 'v' && houseAt(nx, ny) >= 0) scnArrive({ k: 'house', i: houseAt(nx, ny) });
     else if (SCN.k === 'h' && tAt(nx, ny) === 'C') openStore();
   }
-  /* 8방향 패드를 누르고 있는 동안 장면 안에서 계속 걷는다 (막힌 곳에 처음 닿을 때만 집·상자를 연다) */
+  /* 조이스틱을 누르고 있는 동안 장면 안에서 계속 걷는다 (막힌 곳에 처음 닿을 때만 집·상자를 연다) */
   var padScnLast = null;
   setInterval(function () {
     if (!padDir) { padScnLast = null; return; }
     if (!SCN || IRIS || SCN.moving) return;
-    var first = !padScnLast || padScnLast[0] !== padDir[0] || padScnLast[1] !== padDir[1]; padScnLast = padDir;
-    scnPadStep(padDir, first);
+    var ai = (Math.round(Math.atan2(padDir[1], padDir[0]) / (Math.PI / 4)) + 8) % 8, sd = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]][ai];   /* 칸 단위라 가까운 8방향으로 */
+    var first = !padScnLast || padScnLast[0] !== sd[0] || padScnLast[1] !== sd[1]; padScnLast = sd;
+    scnPadStep(sd, first);
   }, 30);
 
   /* --- 퀵 메뉴 --- */
