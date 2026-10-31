@@ -3045,7 +3045,7 @@
     if (!VMODE) {
       var d = vilAutoOK(c);
       if (d) enterVillage(d);
-    }   /* 내 집도 닿기만 해서는 안 들어간다 ([집 들어가기] 버튼) */
+    }   /* 내 집도 닿기만 해서는 안 들어간다 ([집 입장] 버튼) */
   }
   function moveTick() {
     var now = performance.now(), dt = Math.min(0.1, (now - lastMT) / 1000); lastMT = now;
@@ -4385,7 +4385,7 @@
   }
   /* --- 퀵 메뉴: 채팅창 바로 위 가운데에 늘 떠 있는 큰 네모 버튼 줄 (지도·마을·집 모두). 지금 할 수 있는 것만 보인다 ---
      가구를 고르거나 꾸미기 중일 때(QMO)는 그 상황의 버튼으로 바뀐다 */
-  var QDEF = [['quest', '퀘스트', 'quest'], ['bag', '가방', 'bag'], ['enter', '들어가기', 'door'], ['fish', '낚시', 'rod'], ['wood', '벌목', 'axe'], ['dig', '땅파기', 'pick'], ['till', '밭 만들기', 'hoe'], ['paddy', '논 만들기', 'hoe'], ['plant', '심기', 'seedC'], ['harv', '수확', 'carrot'], ['village', '내 마을로', 'door'], ['home', '내 집으로', 'door'], ['buy', '집 구입', 'coin'], ['store', '창고', 'chest'], ['deco', '꾸미기', 'deco'], ['exit', '나가기', 'exitI'], ['map', '지도', 'mapI']];   /* 순서: 퀘스트 · 가방이 늘 맨 앞 */
+  var QDEF = [['quest', '퀘스트', 'quest'], ['bag', '가방', 'bag'], ['enter', '입장', 'door'], ['fish', '낚시', 'rod'], ['wood', '벌목', 'axe'], ['dig', '땅파기', 'pick'], ['till', '밭 만들기', 'hoe'], ['paddy', '논 만들기', 'hoe'], ['plant', '심기', 'seedC'], ['harv', '수확', 'carrot'], ['village', '내 마을로', 'door'], ['home', '내 집으로', 'door'], ['buy', '집 구입', 'coin'], ['store', '창고', 'chest'], ['deco', '꾸미기', 'deco'], ['exit', '나가기', 'exitI'], ['map', '지도', 'mapI']];   /* 순서: 퀘스트 · 가방이 늘 맨 앞 */
   var QBASEDEF = QDEF.slice();
   function buildQM() {
     var qm = $('qm'); qm.innerHTML = '';
@@ -4431,7 +4431,7 @@
       else if ((k === 'till' || k === 'paddy') && (f || VMODE)) on = false;
       else on = handHas(ACTDEF[k].tool);
       var gray = !!VMODE && !SCN && (k === "fish" || k === "wood" || k === "dig");   /* 마을 안에서는 회색으로 보이기만 하고 못 쓴다 */
-      el.hidden = !on && !gray; el.classList.toggle("off", gray); el.classList.toggle("hot", on && k === "enter");   /* 마을·집·시청 문 위면 [들어가기]를 반짝 */
+      el.hidden = !on && !gray; el.classList.toggle("off", gray); el.classList.toggle("hot", on && k === "enter");   /* 마을·집·시청 문 위면 [입장]를 반짝 */
     });
   }
   function qmPick(k) {
@@ -4970,7 +4970,7 @@
     inf.appendChild(elx('small', 'gold', '골드 ' + (me.res.g || 0))); inf.appendChild(elx('small', '', '낚시 ' + (v.st.fish || 0) + ' · 벌목 ' + (v.st.wood || 0) + ' · 땅파기 ' + (v.st.dig || 0) + '회')); head.appendChild(inf); body.appendChild(head);
     /* 내가 다녀온 동네 (마을 번호마다 처음 들어간 시각 me.vis) · 방명록 남긴 곳은 📖 */
     var vk = Object.keys(me.vis || {}).sort(function (a, b) { return me.vis[b] - me.vis[a]; }); body.appendChild(elx('div', 'sech', '내가 다녀온 동네 (' + vk.length + '곳)'));
-    var vl = elx('div', 'ivvis'); if (!vk.length) vl.appendChild(elx('small', '', '아직 없어요 · 지도의 깃발 마을에 [들어가기]')); vk.forEach(function (vv) { var gb = me.gb && me.gb[vv]; vl.appendChild(elx('span', 'vtag' + (gb ? ' gb' : ''), vName(+vv) + (gb ? ' 📖' : ''))); }); body.appendChild(vl);
+    var vl = elx('div', 'ivvis'); if (!vk.length) vl.appendChild(elx('small', '', '아직 없어요 · 지도의 깃발 마을에 [입장]')); vk.forEach(function (vv) { var gb = me.gb && me.gb[vv]; vl.appendChild(elx('span', 'vtag' + (gb ? ' gb' : ''), vName(+vv) + (gb ? ' 📖' : ''))); }); body.appendChild(vl);
     /* 장착: 손 · 가방 */
     body.appendChild(elx('div', 'sech', '장착'));
     var eq = elx('div', 'iveq');
@@ -6574,7 +6574,7 @@
   function closeStoreWin() { if (me && me.house) { var u = me.house.store.u; OPENS = OPENS.filter(function (w) { return w.u !== u; }); ivSig = ''; if (!$('inv').hidden) renderInv(); } }
   if (0) setInterval(function () {
     if (!me || SCN) return; var d = vilAt(me.cell);
-    if (d && vilHint !== me.cell && !me.mv) { vilHint = me.cell; toast((NAME[d] || '') + ' 마을 · 캐릭터를 눌러 [마을 들어가기]'); }
+    if (d && vilHint !== me.cell && !me.mv) { vilHint = me.cell; toast((NAME[d] || '') + ' 마을 · 캐릭터를 눌러 [마을 입장]'); }
     else if (!d) vilHint = -1;
   }, 500);
 
@@ -6689,7 +6689,7 @@
   /* 마을 등급: 3 = 시청(시) · 2 = 구청·군청 · 1 = 주민센터(읍·면·동). 등급이 높을수록 마을을 화려하게 꾸민다 */
   function vTier(v) { if (v > VDONG0) return 1; var n = NAME[v] || ''; return /시$/.test(n) ? 3 : 2; }
 
-  /* ---------- v114: 마을 = 지도 그 자체 (같은 이동·같은 타일). 마을 들어가기를 하면 마을 칸 둘레에 집이 가득 찬다 ---------- */
+  /* ---------- v114: 마을 = 지도 그 자체 (같은 이동·같은 타일). 마을 입장를 하면 마을 칸 둘레에 집이 가득 찬다 ---------- */
   var VMODE = 0, VHC = {}, VHI = null;
   function drawVillages(c, s, tx, ty, v) {
     VHR = []; if (s < 8 || !vilInit()) return; drawFence(c, s, tx, ty, v);
@@ -6715,7 +6715,7 @@
   function scnQ(k) {
     if (SCN) return k === 'exit' || k === 'store' || k === 'deco';
     if (!me) return false; var hi = vHouseAt(me.cell);
-    if (k === 'enter') return VMODE ? (hi >= 0 && (isMineC(me.cell) || !!doorKind(me.cell))) : !!vilAt(me.cell);   /* 마을 칸 · 내 집 · 시청 · 낚시점 문 앞에 서 있으면 [들어가기] 버튼 */
+    if (k === 'enter') return VMODE ? (hi >= 0 && (isMineC(me.cell) || !!doorKind(me.cell))) : !!vilAt(me.cell);   /* 마을 칸 · 내 집 · 시청 · 낚시점 문 앞에 서 있으면 [입장] 버튼 */
     if (k === 'buy') return hi >= 0 && VHS[hi].k !== 's' && !isMineC(me.cell) && !me.house;
     if (k === 'exit') return !!VMODE;
     return false;
@@ -6723,7 +6723,7 @@
   function scnLabel(qm) {
     var set = function (k, t) { var el = qm.querySelector('[data-q="' + k + '"] span'); if (el) el.textContent = t; };
     var hi = me ? vHouseAt(me.cell) : -1;
-    set('enter', SCN ? '' : hi >= 0 ? (doorKind(me.cell) ? VHS[hi].n === '시청' ? vHall(VMODE) + ' 들어가기' : VHS[hi].n + ' 들어가기' : '집 들어가기') : '마을 들어가기'); set('exit', SCN ? '집 나가기' : '마을 나가기');
+    set('enter', SCN ? '' : hi >= 0 ? (doorKind(me.cell) ? VHS[hi].n === '시청' ? vHall(VMODE) + ' 입장' : VHS[hi].n + ' 입장' : '집 입장') : '마을 입장'); set('exit', SCN ? '집 나가기' : '마을 나가기');
     if (hi >= 0) set('buy', vPrice(hi) ? '임대하기 ' + vPrice(hi) + 'G' : '내 집 받기');
   }
   function scnPick(k) {
@@ -6760,9 +6760,9 @@
     if (!me || SCN) return;
     if (VMODE) { var ctr = vilHouses(VMODE).center, dd = Math.max(Math.abs(me.cell % GW - ctr % GW), Math.abs(((me.cell / GW) | 0) - ((ctr / GW) | 0))); if (dd > 80 && !IRIS) { setVMode(0); return; } }
     var hi = vHouseAt(me.cell), d = vilAt(me.cell), key = hi >= 0 ? 'h' + me.cell : d ? 'v' + me.cell : '';
-    /* 내 집 칸에 닿아도 저절로 들어가지 않는다 ([집 들어가기] 버튼) */
-    if (key && vilHint !== key && !me.mv && hi >= 0 && doorKind(me.cell)) { vilHint = key; toast((VHS[hi].n === '시청' ? vHall(VMODE) : VHS[hi].n) + ' · [들어가기]를 눌러요'); }   /* 시청 · 낚시점은 닿기만 해서는 안 열린다 */
-    else if (key && vilHint !== key && !me.mv) { vilHint = key; toast(hi >= 0 ? (VHS[hi].k === 's' ? (VHS[hi].n === '시청' ? vHall(VMODE) + (me.house ? '' : ' · [임대주택 신청]을 눌러요') : VHS[hi].n + ' · 준비 중이에요') : isMineC(me.cell) ? '내 임대주택' : (me.house && me.house.d) ? '이웃집이에요' : VHS[hi].n + (vPrice(hi) ? ' ' + vPrice(hi) + '골드 · 아래 [임대하기]를 눌러요' : ' · 무료 임대주택이에요')) : (VMODE ? vName(VMODE) + ' 마을' : vName(d) + ' 마을 · 아래 [마을 들어가기]를 눌러요')); }
+    /* 내 집 칸에 닿아도 저절로 들어가지 않는다 ([집 입장] 버튼) */
+    if (key && vilHint !== key && !me.mv && hi >= 0 && doorKind(me.cell)) { vilHint = key; toast((VHS[hi].n === '시청' ? vHall(VMODE) : VHS[hi].n) + ' · [입장]를 눌러요'); }   /* 시청 · 낚시점은 닿기만 해서는 안 열린다 */
+    else if (key && vilHint !== key && !me.mv) { vilHint = key; toast(hi >= 0 ? (VHS[hi].k === 's' ? (VHS[hi].n === '시청' ? vHall(VMODE) + (me.house ? '' : ' · [임대주택 신청]을 눌러요') : VHS[hi].n + ' · 준비 중이에요') : isMineC(me.cell) ? '내 임대주택' : (me.house && me.house.d) ? '이웃집이에요' : VHS[hi].n + (vPrice(hi) ? ' ' + vPrice(hi) + '골드 · 아래 [임대하기]를 눌러요' : ' · 무료 임대주택이에요')) : (VMODE ? vName(VMODE) + ' 마을' : vName(d) + ' 마을 · 아래 [마을 입장]를 눌러요')); }
     else if (!key) vilHint = -1;
   }, 500);
   /* 지도: 내 집이 있는 마을 칸 위에 HOME 표시 ([내 마을로]를 누르면 여기로 돌아온다) */
@@ -6900,9 +6900,9 @@
     else walkTo(vc);
   }
   /* 저절로 들어가는 때: 걸어서 지나갈 때는 안 들어가고, 멈췄을 때만. 시·군·구청 마을은 멈추면 바로,
-     주민센터 마을(촘촘해서)은 그 칸을 눌러 찾아갔을 때만 — 아니면 아래 [마을 들어가기] 버튼 */
+     주민센터 마을(촘촘해서)은 그 칸을 눌러 찾아갔을 때만 — 아니면 아래 [마을 입장] 버튼 */
   var VSKIP = -1;   /* 마을에서 막 나온 칸: 한 번 벗어날 때까지 저절로 들어가지 않는다 */
-  function vilAutoOK(c) { var v = vilAt(c); if (VSKIP >= 0 && me && me.cell !== VSKIP) VSKIP = -1; if (!v || walkT || c === VSKIP) return 0; return AUTO_HOME_PENDING === v ? v : 0; }   /* 닿기만 해서는 안 들어간다: [들어가기] 버튼으로만 (내 집으로 가기 중일 때만 저절로) */
+  function vilAutoOK(c) { var v = vilAt(c); if (VSKIP >= 0 && me && me.cell !== VSKIP) VSKIP = -1; if (!v || walkT || c === VSKIP) return 0; return AUTO_HOME_PENDING === v ? v : 0; }   /* 닿기만 해서는 안 들어간다: [입장] 버튼으로만 (내 집으로 가기 중일 때만 저절로) */
   function exitVillage() { if (IRIS || !VMODE) return; AUTO_HOME_PENDING = 0; try { stopWalk(); } catch (e) {} iris(function () { VSKIP = me.vret || -1; walkTarget = -1; setVMode(0); }); }
   /* 지도에서 마을 표시 타일에 완전히 들어오면 자동 입장 */
   setInterval(function () {
@@ -6934,7 +6934,7 @@
   function vrGate(c) { var l = vrLocal(c); return l[1] === VI && (l[0] === VGATE[0] || l[0] === VGATE[1]); }
   function vrFence(c) { if (!VMODE || !vrIn(c)) return false; var l = vrLocal(c); if (vrGate(c)) return false; return l[0] < 0 || l[1] < 0 || l[0] >= VI || l[1] >= VI; }
   function vrCarve(d) {
-    if (!vrFind()) return false; VLAY = vrLayout(d); var X, Y, i, c, L;
+    if (!vrFind()) return false; vLayoutApply(d); VLAY = vrLayout(d); var X, Y, i, c, L;
     if (!VBAK) { VBAK = []; for (Y = 0; Y < RS; Y++) for (X = 0; X < RS; X++) { c = vrAbs(X, Y); VBAK.push([grid[c], TER[c], RIV[c], ELV ? ELV[c] : 0, LU ? LU[c] : 0, UDEN[c], TF[c]]); } }
     for (Y = 0, i = 0; Y < RS; Y++) for (X = 0; X < RS; X++, i++) {
       c = vrAbs(X, Y); L = VLAY[i]; grid[c] = vDist(d) || 1; TER[c] = L.t;   /* 마을 번호(d)는 1000이 넘을 수 있어 땅에는 시·군·구 번호를 적는다 */ RIV[c] = 0; UDEN[c] = 0; TF[c] = 1; bld[c] = 0; if (terr) terr[c] = 0;
@@ -6955,7 +6955,7 @@
     return '<b>' + esc(vName(VMODE)) + ' 마을</b>';
   }
   function hallAt(c) { var i = vHouseAt(c); return i >= 0 && VHS[i].n === '시청'; }
-  /* 마을 안 [들어가기]로 여는 건물 문: 'hall' 시청(주민센터) · 'fish' 낚시점 */
+  /* 마을 안 [입장]로 여는 건물 문: 'hall' 시청(주민센터) · 'fish' 낚시점 */
   function doorKind(c) { var i = vHouseAt(c); if (i < 0) return ''; var n = VHS[i].n; return n === '시청' ? 'hall' : n === '낚시점' ? 'fish' : ''; }
   function enterDoor(c) { var k = doorKind(c); if (k === 'hall') openHallWin(); else if (k === 'fish') openFishShop(); }
   /* 시청(주민센터) 창 — 낚시점과 같은 창(#furnPicker). 기능은 HALL_MENU 에 하나씩 더하면 된다
@@ -7048,6 +7048,83 @@
   function vbMap() { if (VBM) return VBM; VBM = {}; VHS.forEach(function (q, i) { var w = q.w || 2, h = q.h || 2, x0 = q.x - (q.ex || 0); for (var dx = 0; dx < w; dx++) for (var dy = -(h - 1); dy <= 0; dy++) VBM[(x0 + dx) + ',' + (q.y + dy)] = i; }); return VBM; }
   function vbAt(c) { if (!VMODE || !VR || !vrIn(c)) return -1; var l = vrLocal(c), i = vbMap()[l[0] + ',' + l[1]]; return i === undefined ? -1 : i; }
   function vbSolid(c) { var i = vbAt(c); return i >= 0 && c !== vrCell(VHS[i].x, VHS[i].y); }
+  /* ---------- 마을마다 다른 모양: 길 패턴 + 건물 배치를 마을 번호(d)로 정한다 ----------
+     같은 마을은 누구에게나 똑같이 보이고(번호로만 정함), 마을마다 길 줄 수 · 시청 자리 · 가게 순서 · 좌우 뒤집기가 다르다.
+     VHS 순서와 개수는 그대로 (저장된 집 번호가 바뀌지 않게) — 자리(x, y)만 바꾼다. 입구(VGATE 14·15)와 세로 큰길은 그대로 */
+  var VPAT = [
+    { roads: [11, 18, 24, 28], hall: 'top' },      /* 시청이 위 가운데 · 길 4줄 */
+    { roads: [9, 15, 21, 28], hall: 'top' },
+    { roads: [12, 19, 27], hall: 'top' },          /* 길 3줄 · 넓은 마을 */
+    { roads: [10, 17, 24, 28], hall: 'side' },     /* 시청이 옆 줄에 */
+    { roads: [9, 16, 22, 28], hall: 'side' },
+    { roads: [11, 17, 23, 28], hall: 'low' }       /* 시청이 입구 가까이 */
+  ];
+  var VORIG = VHS.map(function (q) { return { x: q.x, y: q.y }; }), VROAD = null, VLD = 0;
+  function vRng(d) { var n = 0; return function () { n++; return hash(d * 7 + n, n * 13 + 5, 211); }; }
+  function vTryLayout(d, pat, rnd, flip) {
+    var roads = pat.roads, top = roads[0], segs = [], i, ok = true, pos = [], road = {};
+    roads.forEach(function (ry, k) {
+      var hmax = ry - (k ? roads[k - 1] : 1) - 2;
+      if (k === 0) segs.push({ ry: ry, a: 3, b: 26, h: hmax, cur: [3, 26], top: 1 });
+      else { segs.push({ ry: ry, a: 3, b: 13, h: hmax, side: -1 }); segs.push({ ry: ry, a: 16, b: 26, h: hmax, side: 1 }); }
+    });
+    segs.forEach(function (g) { g.used = []; });
+    function fits(g, x0, w) { if (x0 < g.a || x0 + w - 1 > g.b) return false; return !g.used.some(function (u) { return x0 < u[1] + 2 && u[0] < x0 + w + 1; }); }
+    function put(g, x0, w) { g.used.push([x0, x0 + w - 1]); }
+    /* 가운데(입구 큰길)에서 바깥으로, 아니면 바깥에서 안으로 — 마을마다 다르게 */
+    var inward = rnd() < 0.5;
+    function slot(g, w) {
+      var xs = [], x; for (x = g.a; x + w - 1 <= g.b; x++) xs.push(x);
+      var mid = 14.5; xs.sort(function (p, q) { var dp = Math.abs(p + w / 2 - mid), dq = Math.abs(q + w / 2 - mid); return inward ? dp - dq : dq - dp; });
+      for (var j = 0; j < xs.length; j++) if (fits(g, xs[j], w)) return xs[j]; return -1;
+    }
+    function place(idx, g, x0) { var q = VHS[idx], w = q.w || 2; put(g, x0, w); pos[idx] = { x0: x0, y: g.ry - 1, w: w }; }
+    function tryAny(idx, list) {
+      var q = VHS[idx], w = q.w || 2, h = q.h || 2;
+      for (var j = 0; j < list.length; j++) { var g = list[j]; if (g.h < h) continue; var x0 = slot(g, w); if (x0 >= 0) { place(idx, g, x0); return true; } }
+      return false;
+    }
+    function shuf(a) { a = a.slice(); for (var j = a.length - 1; j > 0; j--) { var k = (rnd() * (j + 1)) | 0, t = a[j]; a[j] = a[k]; a[k] = t; } return a; }
+    var hallI = -1, rentI = -1, shops = [], homes = [];
+    VHS.forEach(function (q, k) { if (q.n === '시청') hallI = k; else if (q.n === '임대주택') rentI = k; else if (q.k === 's') shops.push(k); else homes.push(k); });
+    /* 1) 시청 */
+    var hs;
+    if (pat.hall === 'top') { var g0 = segs[0]; if (g0.h >= 5 && fits(g0, 12, 5)) place(hallI, g0, 12); else ok = false; }
+    else {
+      hs = segs.filter(function (g) { return !g.top && g.h >= 5; });
+      if (pat.hall === 'low') hs.reverse(); else hs = shuf(hs);
+      ok = ok && tryAny(hallI, hs);
+    }
+    /* 2) 임대주택: 맨 아래 길, 입구 큰길 바로 옆 */
+    var low = segs.filter(function (g) { return g.ry === roads[roads.length - 1] && !g.top; });
+    if (ok) { var g1 = low[(rnd() * low.length) | 0] || low[0]; var xr = g1.side < 0 ? 12 : 16; if (fits(g1, xr, 2)) place(rentI, g1, xr); else ok = tryAny(rentI, low); }
+    /* 3) 가게 → 4) 집: 줄 순서를 섞어서 채운다 */
+    var order = shuf(segs);
+    shuf(shops).forEach(function (k) { if (ok) ok = tryAny(k, order); });
+    order = shuf(segs);
+    homes.forEach(function (k) { if (ok) ok = tryAny(k, order); });
+    if (!ok) return null;
+    /* 길: 각 줄은 그 줄 건물 양 끝까지 (세로 큰길 14·15와 늘 이어진다) + 세로 큰길은 맨 위 길부터 입구까지 */
+    roads.forEach(function (ry) {
+      var a = 14, b = 15; segs.forEach(function (g) { if (g.ry === ry) g.used.forEach(function (u) { a = Math.min(a, u[0]); b = Math.max(b, u[1]); }); });
+      for (var x = a; x <= b; x++) road[x + ',' + ry] = 1;
+    });
+    for (var y = top; y < VI; y++) { road['14,' + y] = 1; road['15,' + y] = 1; }
+    /* 좌우 뒤집기 (입구 14·15는 뒤집어도 14·15) */
+    if (flip) { var r2 = {}; Object.keys(road).forEach(function (kk) { var a2 = kk.split(','); r2[(VI - 1 - a2[0]) + ',' + a2[1]] = 1; }); road = r2; }
+    /* 문 칸은 늘 건물 왼쪽에서 ex칸째 (그림이 그렇게 그려진다) — 뒤집어도 건물 자리만 옮기고 문 쪽은 그대로 */
+    var out = pos.map(function (p, k) { var x0 = flip ? VI - 1 - (p.x0 + p.w - 1) : p.x0; return { x: x0 + (VHS[k].ex || 0), y: p.y }; });
+    return { pos: out, road: road };
+  }
+  function vLayoutApply(d) {
+    if (VLD === d && VROAD) return; VLD = d;
+    var rnd = vRng(d), pi = (hash(d, 3, 223) * VPAT.length) | 0, flip = hash(d, 9, 227) < 0.5, L = null;
+    for (var t = 0; t < VPAT.length && !L; t++) L = vTryLayout(d, VPAT[(pi + t) % VPAT.length], rnd, flip);
+    if (!L) {   /* 혹시 안 맞으면 예전 모양 */
+      VHS.forEach(function (q, k) { q.x = VORIG[k].x; q.y = VORIG[k].y; }); VROAD = null;
+    } else { VHS.forEach(function (q, k) { q.x = L.pos[k].x; q.y = L.pos[k].y; }); VROAD = L.road; }
+    VBM = null;
+  }
   /* v127: 땅에 세운 나무 간판 — 기둥 두 개 + 널빤지 (바닥 가운데가 cx, 발밑이 gy) */
   function groundSign(c, text, cx, gy, s, wall) {
     var q = Math.max(1, Math.round(s / 32)), fs = Math.max(9, Math.round(s * 0.24)); c.save(); c.font = '700 ' + fs + "px Galmuri11, 'Apple SD Gothic Neo', 'Malgun Gothic', monospace"; c.textAlign = 'center'; c.textBaseline = 'middle';
@@ -7111,7 +7188,8 @@
       var x = X - VB, y = Y - VB, inside = x >= 0 && y >= 0 && x < VI && y < VI, ring = !inside && x >= -1 && y >= -1 && x <= VI && y <= VI, gate = y === VI && (x === VGATE[0] || x === VGATE[1]);
       var edge = inside ? Math.min(x, y, VI - 1 - x, VI - 1 - y) : -1, h = 0;
       hills.forEach(function (hp) { var dd = Math.hypot(x - hp[0], y - hp[1]); if (dd < 2.6) h = Math.max(h, 6); else if (dd < 4) h = Math.max(h, 2); });
-      var road = inside && ((x >= 14 && x <= 15 && y >= 16) || ((y === 16 || y === 21 || y === 27) && x >= 3 && x <= 26)), plaza = false;   /* 시청 앞 돌 광장은 없앴다 (병원 그림을 덮어서) */
+      var road = inside && (VROAD ? !!VROAD[x + ',' + y] : ((x >= 14 && x <= 15 && y >= 16) || ((y === 16 || y === 21 || y === 27) && x >= 3 && x <= 26))), plaza = false;
+      if (h && inside && VROAD) { for (var ny = y - 1; ny <= y + 1 && h; ny++) for (var nx = x - 1; nx <= x + 1; nx++) if (VROAD[nx + ',' + ny] || vbMap()[nx + ',' + ny] !== undefined) { h = 0; break; } }   /* 시청 앞 돌 광장은 없앴다 (병원 그림을 덮어서) */
       var house = inside && vbMap()[x + ',' + y] !== undefined, t = 1;
       if (!inside && !ring && !gate) t = 3;
       else if (inside && !road && !plaza && !house && (edge < 2 + ((hash(x, y + d, 73) * 2) | 0) || hash(x * 3 + d, y, 79) < 0.05)) t = 3;
@@ -7406,12 +7484,12 @@
      새 퀘스트는 QUESTS 에 하나씩 더한다: { id, n: 이름, max: 목표, now(): 지금 횟수, g: 보상 골드, hint } */
   var QUESTS = [
     { id: 'rent', n: '시청에 가서 임대주택을 신청하세요', max: 1, now: function () { return me.house && me.house.d ? 1 : 0; }, g: 0, go: 1,
-      hint: function () { return '내 동네: ' + (mapName(me.home) || '') + ' · 시청 마을 가운데 큰 건물 문 앞에서 [들어가기] → [임대주택 신청]'; } },
+      hint: function () { return '내 동네: ' + (mapName(me.home) || '') + ' · 시청 마을 가운데 큰 건물 문 앞에서 [입장] → [임대주택 신청]'; } },
     { id: 'fish10', n: '물고기 10마리 잡기', max: 10, now: function () { return qN('fish'); }, g: 50, hint: function () { return '마을 밖 물가에서 아래 [낚시]'; } },
     { id: 'wood10', n: '나무 10번 베기', max: 10, now: function () { return qN('wood'); }, g: 50, hint: function () { return '마을 밖 숲에서 아래 [벌목]'; } },
     { id: 'dig10', n: '땅 10번 파기', max: 10, now: function () { return qN('dig'); }, g: 50, hint: function () { return '마을 밖 아무 땅에서 아래 [땅파기]'; } },
-    { id: 'gb3', n: '방명록 3곳에 남기기', max: 3, now: function () { return Object.keys(me.gb || {}).length; }, g: 100, hint: function () { return '시청·주민센터에 [들어가기] → [방명록]'; } },
-    { id: 'vis5', n: '동네 5곳 다녀오기', max: 5, now: function () { return Object.keys(me.vis || {}).length; }, g: 100, hint: function () { return '지도의 깃발 마을에 [들어가기]'; } }
+    { id: 'gb3', n: '방명록 3곳에 남기기', max: 3, now: function () { return Object.keys(me.gb || {}).length; }, g: 100, hint: function () { return '시청·주민센터에 [입장] → [방명록]'; } },
+    { id: 'vis5', n: '동네 5곳 다녀오기', max: 5, now: function () { return Object.keys(me.vis || {}).length; }, g: 100, hint: function () { return '지도의 깃발 마을에 [입장]'; } }
   ];
   function qN(k) { return (me.qs && me.qs[k]) || 0; }
   /* 행동이 끝날 때마다 (29 finishAct). 낚시는 물고기를 잡았을 때만 센다 */
@@ -7465,7 +7543,7 @@
     if (!me) return; if (SCN) { toast('집에서 나온 뒤 눌러 주세요'); return; }
     if (VMODE && VMODE !== me.home) { toast('아, 이곳 시청은 아니구나! [' + (mapName(me.home) || '') + '] 마을로 가야 해'); return; }   /* 다른 동네 마을이면 안내만 하고 그 자리에 */
     if (VMODE) { var H = VHS.filter(function (q) { return q.n === '시청'; })[0]; if (H) walkTo(vrCell(H.x, H.y)); return; }
-    var sc = SEAT[me.home]; if (sc >= 0) { if (me.cell === sc) toast('여기가 시청 마을이에요 · [들어가기]를 눌러요'); else walkTo(sc); }
+    var sc = SEAT[me.home]; if (sc >= 0) { if (me.cell === sc) toast('여기가 시청 마을이에요 · [입장]를 눌러요'); else walkTo(sc); }
   }
   setInterval(questSync, 1000);
   /* ---------- 방명록: 마을(번호)마다 시청·주민센터에 남기는 글. 저장 K+'gb:'+마을번호 (같은 컴퓨터 안에서 공유) ---------- */
