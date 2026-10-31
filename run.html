@@ -33,10 +33,14 @@
     </div>
     <div class="minimap" id="minimap"><b>지도</b><canvas id="mini" aria-label="전국 지도. 누르면 큰 지도가 열립니다."></canvas></div>
     <div class="dpad" id="dpad" aria-label="방향 버튼">
+      <button class="ul" type="button" data-d="-1,-1" aria-label="왼쪽 위로">◤</button>
       <button class="up" type="button" data-d="0,-1" aria-label="위로">▲</button>
+      <button class="ur" type="button" data-d="1,-1" aria-label="오른쪽 위로">◥</button>
       <button class="lf" type="button" data-d="-1,0" aria-label="왼쪽으로">◀</button>
       <button class="rt" type="button" data-d="1,0" aria-label="오른쪽으로">▶</button>
+      <button class="dl" type="button" data-d="-1,1" aria-label="왼쪽 아래로">◣</button>
       <button class="dn" type="button" data-d="0,1" aria-label="아래로">▼</button>
+      <button class="dr" type="button" data-d="1,1" aria-label="오른쪽 아래로">◢</button>
       <button class="put" type="button" id="padPlace" aria-label="건설" disabled style="visibility:hidden">건설</button>
       <button class="ferry" type="button" id="ferryBtn" aria-pressed="false" aria-label="다음 이동에서 바다 건너기">배</button>
     </div>

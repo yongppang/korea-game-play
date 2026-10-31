@@ -1117,3 +1117,28 @@ body:has(#chat:not([hidden])) .dpad { display: none !important; }   /* 채팅창
 /* 마을 칸(또는 집·시청·낚시점 문) 위에 서 있으면 [들어가기] 버튼을 노랗게 반짝 */
 .qm .qb.hot { background: #ffd84a; color: #2a1a08; border-color: #fff; animation: qbHot 0.9s ease-in-out infinite; }
 @keyframes qbHot { 0%, 100% { box-shadow: 3px 3px 0 #0a1030, 0 0 0 0 rgba(255, 216, 74, 0.8); transform: translateY(0); } 50% { box-shadow: 3px 3px 0 #0a1030, 0 0 0 6px rgba(255, 216, 74, 0); transform: translateY(-3px); } }
+
+/* ---------- 아래 버튼 줄: 한 줄로 · 조금 작게 · 옆으로 밀어서 보기 ---------- */
+.qm { flex-wrap: nowrap !important; justify-content: flex-start !important; overflow-x: auto; overflow-y: hidden; max-width: calc(100vw - 16px) !important; gap: 6px !important; padding: 2px 4px 6px; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; touch-action: pan-x; scrollbar-width: none; }
+.qm::-webkit-scrollbar { display: none; }
+.qm .qb { flex: 0 0 auto; min-width: 64px !important; height: 64px !important; font-size: 11px !important; gap: 3px !important; scroll-snap-align: start; }
+.qm .qb canvas { width: 30px !important; height: 30px !important; }
+@media (max-width: 640px) { .qm .qb { min-width: 56px !important; height: 56px !important; padding: 0 5px !important; font-size: 10.5px !important; border-width: 2px !important; } .qm .qb canvas { width: 26px !important; height: 26px !important; } }
+
+/* ---------- 8방향 패드 (마을·집 안에서도 보인다) ---------- */
+.dpad .ul { grid-column: 1; grid-row: 1; } .dpad .up { grid-column: 2; grid-row: 1; } .dpad .ur { grid-column: 3; grid-row: 1; }
+.dpad .lf { grid-column: 1; grid-row: 2; } .dpad .rt { grid-column: 3; grid-row: 2; }
+.dpad .dl { grid-column: 1; grid-row: 3; } .dpad .dn { grid-column: 2; grid-row: 3; } .dpad .dr { grid-column: 3; grid-row: 3; }
+.dpad { touch-action: none; -webkit-touch-callout: none; }
+.dpad .ul, .dpad .ur, .dpad .dl, .dpad .dr { font-size: 15px !important; opacity: 0.85; }
+.dpad button.on { background: rgba(255, 216, 74, 0.7) !important; color: #2a1a08 !important; }
+body.inscn .dpad { display: grid !important; }
+body.vnon .dpad, body:has(#inv:not([hidden])) .dpad { display: none !important; }
+
+/* ---------- 설정 버튼: 톱니바퀴 그림만 ---------- */
+.setbtn { width: 42px; height: 42px; padding: 0 !important; display: flex; align-items: center; justify-content: center; }
+.setbtn canvas { width: 30px; height: 30px; image-rendering: pixelated; pointer-events: none; }
+
+/* ---------- 채팅 연결 점: 화면 오른쪽 위 ---------- */
+.netst { position: fixed !important; top: 8px; right: 8px; z-index: 41; width: 30px; height: 30px; padding: 0 !important; justify-content: center; border-radius: 50% !important; background: rgba(20, 20, 30, 0.7) !important; border: 2px solid #fff3c4; }
+body.vnon .netst { display: none !important; }
