@@ -1,4 +1,4 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="only light"><meta name="theme-color" content="#16246a"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png"><meta name="claude:viewport-fit-sides" content="cover"><meta http-equiv="Cache-Control" content="no-cache"><style id="preGate">body>*:not(#verGate){visibility:hidden}</style><title>코리아 톡</title></head>
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="only light"><meta name="theme-color" content="#16246a"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png"><meta name="claude:viewport-fit-sides" content="cover"><meta http-equiv="Cache-Control" content="no-cache"><style id="preGate">body>*:not(#verGate):not(#kakaoGate){visibility:hidden}</style><title>코리아 톡</title></head>
 <body>
 <div class="where" id="where" role="status" aria-live="polite"><b id="whereA"></b><small id="whereB"></small></div>
 <header class="hud" id="hud">
@@ -230,7 +230,12 @@
 
 
 
-<script>(function(){var V='2c5c04983c',done=0;window.GAME_VER=V;
+<script>(function(){if(!/KAKAOTALK/i.test(navigator.userAgent))return;window.KAKAO_GATE=1;
+function open(){location.href='kakaotalk://web/openExternal?url='+encodeURIComponent(location.href);setTimeout(function(){h.hidden=false;},1500);}
+var d=document.createElement('div');d.id='kakaoGate';d.style.cssText='position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:#000;color:#fff;font:700 16px/1.6 sans-serif;text-align:center;padding:24px';
+d.innerHTML='<button type="button" style="font:inherit;font-size:18px;padding:12px 32px;border:2px solid #ffd84a;background:#1a1a1a;color:#ffd84a;cursor:pointer;border-radius:4px">이어서하기</button><small hidden style="color:#aaa;font-weight:400;font-size:13px">브라우저가 열리지 않으면 오른쪽 위 메뉴에서<br>[다른 브라우저로 열기]를 눌러 주세요.</small>';
+var h=d.querySelector('small');d.querySelector('button').onclick=open;document.body.appendChild(d);})();</script>
+<script>(function(){var V='2c5c04983c',done=0;window.GAME_VER=V;if(window.KAKAO_GATE)return;
 function go(){if(done++)return;var l=document.createElement('link');l.rel='stylesheet';l.href='game.css?v='+V;setTimeout(function(){var p=document.getElementById('preGate');p&&p.remove();},15000);document.head.appendChild(l);var s=document.createElement('script');s.src='game.js?v='+V;document.body.appendChild(s);}
 function stop(){if(done++)return;var d=document.createElement('div');d.id='verGate';d.style.cssText='position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#10161c;color:#fff;font:700 16px/1.6 sans-serif;text-align:center;padding:24px';
 d.innerHTML='<div>새 버전을 준비하고 있어요.<br>잠시 뒤에 다시 실행해 주세요.</div><button type="button" style="font:inherit;padding:8px 20px;border:2px solid #ffd84a;background:#2a3440;color:#ffd84a;cursor:pointer">다시 시도</button>';
