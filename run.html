@@ -234,7 +234,7 @@
 function open(){location.href='kakaotalk://web/openExternal?url='+encodeURIComponent(location.href);setTimeout(function(){h.hidden=false;},1500);}
 var d=document.createElement('div');d.id='kakaoGate';d.style.cssText='position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:#000;color:#fff;font:700 16px/1.6 sans-serif;text-align:center;padding:24px';
 d.innerHTML='<button type="button" style="font:inherit;font-size:18px;padding:12px 32px;border:2px solid #ffd84a;background:#1a1a1a;color:#ffd84a;cursor:pointer;border-radius:4px">이어서하기</button><small hidden style="color:#aaa;font-weight:400;font-size:13px">브라우저가 열리지 않으면 오른쪽 위 메뉴에서<br>[다른 브라우저로 열기]를 눌러 주세요.</small>';
-var h=d.querySelector('small');d.querySelector('button').onclick=open;document.body.appendChild(d);})();</script>
+var h=d.querySelector('small');d.querySelector('button').onclick=open;document.body.appendChild(d);open();})();</script>
 <script>(function(){var V='2c5c04983c',done=0;window.GAME_VER=V;if(window.KAKAO_GATE)return;
 function go(){if(done++)return;var l=document.createElement('link');l.rel='stylesheet';l.href='game.css?v='+V;setTimeout(function(){var p=document.getElementById('preGate');p&&p.remove();},15000);document.head.appendChild(l);var s=document.createElement('script');s.src='game.js?v='+V;document.body.appendChild(s);}
 function stop(){if(done++)return;var d=document.createElement('div');d.id='verGate';d.style.cssText='position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#10161c;color:#fff;font:700 16px/1.6 sans-serif;text-align:center;padding:24px';
@@ -242,4 +242,23 @@ d.innerHTML='<div>새 버전을 준비하고 있어요.<br>잠시 뒤에 다시 
 d.querySelector('button').onclick=function(){location.replace(location.pathname+'?t='+Date.now());};document.body.appendChild(d);}
 try{fetch('version.json?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}).then(function(j){j&&j.v===V?go():stop();},go);}catch(e){go();}
 setTimeout(go,5000);})();</script>
+<script>(function(){/* 다크 모드 브라우저가 글자색을 바꾸지 못하게 타이틀을 캔버스로 그린다 */
+var b,cv,ts='',t0=Date.now();
+function px(v){return parseFloat(v)||0;}
+function draw(){var cs=getComputedStyle(b),lines=['모두의','한국'],fs=px(cs.fontSize),lh=px(cs.lineHeight)||fs*1.15,font=cs.fontWeight+' '+fs+'px '+cs.fontFamily;
+var sh=[];ts.replace(/(rgba?\([^)]*\)|#[0-9a-f]+)\s+(-?[\d.]+)px\s+(-?[\d.]+)px(?:\s+([\d.]+)px)?/gi,function(m,c,x,y,bl){sh.push({c:c,x:+x,y:+y,b:+(bl||0)});});
+var pl=0,pr=0,pt=0,pb=0;sh.forEach(function(o){pl=Math.max(pl,o.b-o.x);pr=Math.max(pr,o.b+o.x);pt=Math.max(pt,o.b-o.y);pb=Math.max(pb,o.b+o.y);});
+var x=cv.getContext('2d');x.font=font;var w=0;lines.forEach(function(l){w=Math.max(w,x.measureText(l).width);});
+var W=Math.ceil(w+pl+pr),H=Math.ceil(lh*lines.length+pt+pb),r=window.devicePixelRatio||1;
+cv.width=Math.ceil(W*r);cv.height=Math.ceil(H*r);cv.style.width=W+'px';cv.style.height=H+'px';cv.style.margin='0 '+(-pr)+'px '+(-pb)+'px '+(-pl)+'px';
+x.setTransform(r,0,0,r,0,0);x.font=font;x.textAlign='center';x.textBaseline='middle';var cx=pl+w/2;
+function txt(c,dx,dy){x.fillStyle=c;lines.forEach(function(l,i){x.fillText(l,cx+dx,pt+lh*(i+.5)+dy);});}
+for(var i=sh.length-1;i>=0;i--){var o=sh[i];x.shadowColor='transparent';if(o.b){x.shadowColor=o.c;x.shadowBlur=o.b;}txt(o.c,o.x,o.y);}
+x.shadowColor='transparent';x.shadowBlur=0;txt(cs.color,0,0);}
+function init(){b=document.querySelector('#vnLogo b');if(!b)return;var ff=getComputedStyle(b).fontFamily;
+if(!/Galmuri/i.test(ff)&&Date.now()-t0<15000)return setTimeout(init,100);
+var go=function(){ts=getComputedStyle(b).textShadow||'';b.setAttribute('aria-label','모두의 한국');b.setAttribute('role','img');b.textContent='';cv=document.createElement('canvas');cv.setAttribute('aria-hidden','true');cv.style.display='block';b.appendChild(cv);b.style.textShadow='none';draw();
+var tm;addEventListener('resize',function(){clearTimeout(tm);tm=setTimeout(draw,100);});};
+var cs=getComputedStyle(b);(document.fonts&&document.fonts.load?document.fonts.load(cs.fontWeight+' '+px(cs.fontSize)+'px Galmuri11','모두의한국'):Promise.resolve()).then(go,go);}
+if(!window.KAKAO_GATE)init();})();</script>
 </body></html>
