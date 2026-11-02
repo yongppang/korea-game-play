@@ -7280,10 +7280,595 @@
     /* 임대주택 신청은 시청(가운데 큰 건물) 문 앞의 [임대주택 신청] 버튼으로 한다 */
     return '<b>' + esc(vName(VMODE)) + ' 마을</b>';
   }
+  /* ---------- v131: 시청 · 낚시점 대화 화면 (라떼 입국심사처럼 배경 + 초상 + 대화창) ----------
+     시청(구청·군청·읍면사무소·주민센터) = 강아지 '누리 주무관' · 낚시점 = 수달 '달봉 사장'.
+     대화하면서 임대주택 신청 · 방명록 · O/X 퀴즈 / 낚시대 사기 · 물고기 팔기를 한다 */
+  var NPC = null;   /* 열려 있으면 { k: 'hall'|'fish', emo, talk, tm, typing, raf, ... } */
+  function npcJo(w, a, b) { var c = String(w || '').charCodeAt(String(w || '').length - 1); return (c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28) ? a : b; }   /* 받침이 있으면 a (은·이·과), 없으면 b (는·가·와) */
+  function npcEl() {
+    var v = $('npc'); if (v) return v;
+    v = document.createElement('div'); v.id = 'npc'; v.hidden = true;
+    v.innerHTML = '<canvas id="npcBg" aria-hidden="true"></canvas><div id="npcTop"><b id="npcPlace"></b><span id="npcGold"></span><button type="button" id="npcX">✕ 나가기</button></div>' +
+      '<canvas id="npcCv" width="64" height="56" aria-hidden="true"></canvas><div id="npcStamp" aria-hidden="true"></div>' +
+      '<div id="npcBox"><span id="npcNm"></span><p id="npcTxt" aria-live="polite"></p><div id="npcCh"></div></div>';
+    document.body.appendChild(v);
+    $('npcX').onclick = function () { npcBye(); };
+    $('npcBox').onclick = function (ev) {
+      if (!NPC || ev.target.closest('button, input')) return;
+      if (NPC.typing) { npcFinish(); return; }
+      var bs = $('npcCh').querySelectorAll('button'); if (bs.length === 1 && !$('npcCh').querySelector('input')) bs[0].click();
+    };
+    /* 대화 중에는 게임 단축키·이동을 막는다. Esc = 나가기 · Enter/Space = 넘기기 */
+    window.addEventListener('keydown', function (e) {
+      if (!NPC) return;
+      var inInput = e.target && e.target.tagName === 'INPUT';
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); npcBye(); return; }
+      if (inInput) { e.stopPropagation(); return; }
+      if ((e.key === 'Enter' || e.key === ' ') && !(e.target && e.target.tagName === 'BUTTON')) { e.preventDefault(); $('npcBox').click(); }
+      e.stopPropagation();
+    }, true);
+    window.addEventListener('resize', function () { if (NPC) NPC.bgKey = ''; });
+    return v;
+  }
+  function npcGold() { var g = $('npcGold'); if (g && me) g.textContent = '💰 ' + Math.floor(me.res.g || 0) + ' G'; }
+  function npcOpen(k) {
+    if (!me || !VMODE) return;
+    var v = npcEl(); closeFurnPicker(); if (typeof closeQM === 'function') closeQM();
+    if (typeof stopWalk === 'function') stopWalk();
+    NPC = { k: k, emo: 'n', talk: false, tm: 0, typing: null, raf: 0, t0: performance.now(), bgKey: '', base: null, tick: -1, blinkAt: 0 };
+    v.hidden = false; document.body.classList.add('npcon'); v.className = 'npc-' + k;
+    $('npcPlace').textContent = k === 'hall' ? vName(VMODE) + ' ' + vHall(VMODE) : vName(VMODE) + ' · 달봉이네 낚시점';
+    $('npcNm').textContent = k === 'hall' ? '누리 주무관' : '달봉 사장';
+    npcGold(); $('npcCh').innerHTML = ''; $('npcTxt').textContent = '';
+    NPC.raf = requestAnimationFrame(npcLoop);
+    if (k === 'hall') hallGreet(true); else fishGreet(true);
+  }
+  function npcClose() {
+    if (!NPC) return; clearInterval(NPC.tm); cancelAnimationFrame(NPC.raf); NPC = null;
+    $('npc').hidden = true; document.body.classList.remove('npcon');
+    if (typeof renderDock === 'function') renderDock(); if (typeof requestDraw === 'function') requestDraw();
+  }
+  function npcBye() { if (!NPC) return; var k = NPC.k; npcSay(k === 'hall' ? '살펴 가세요멍! 또 오세요~' : '또 와~! 대어 낚으면 꼭 보여 줘!', function () { setTimeout(npcClose, 650); }, 'h'); $('npcCh').innerHTML = ''; }
+  function npcFinish() { var ty = NPC.typing; NPC.typing = null; clearInterval(NPC.tm); NPC.talk = false; $('npcTxt').textContent = ty.t; if (ty.cb) ty.cb(); }
+  function npcSay(t, cb, emo) {
+    if (!NPC) return; clearInterval(NPC.tm); $('npcCh').innerHTML = ''; $('npcTxt').textContent = ''; if (emo) NPC.emo = emo;
+    var k = 0; NPC.typing = { t: t, cb: cb }; NPC.talk = true;
+    NPC.tm = setInterval(function () { if (!NPC) return; $('npcTxt').textContent = t.slice(0, ++k); if (k >= t.length) { clearInterval(NPC.tm); NPC.typing = null; NPC.talk = false; if (cb) cb(); } }, 28);
+  }
+  function npcBtns(list, fn) {
+    var ch = $('npcCh'); ch.innerHTML = '';
+    list.forEach(function (t, i) { var b = document.createElement('button'); b.type = 'button'; b.textContent = t; if (t.charAt(0) === '←') b.className = 'npcBack'; b.onclick = function (e) { e.stopPropagation(); if (NPC && !NPC.typing) fn(i); }; ch.appendChild(b); });
+  }
+  function npcStamp(ok) {
+    var s = $('npcStamp'); s.textContent = ok ? '⭕' : '❌'; s.className = ''; void s.offsetWidth; s.className = ok ? 'pop ok' : 'pop no';
+  }
+
+  /* ===== 시청 (누리 주무관) ===== */
+  function hallGreet(first) {
+    var h = vHall(VMODE);
+    npcSay(first ? '어서 오세요! ' + vName(VMODE) + ' ' + h + '입니다멍. 무엇을 도와드릴까요?' : '또 도와드릴 일이 있을까요멍?', function () {
+      npcBtns(['🏠 임대주택 신청', '📝 방명록', '⭕ O/X 퀴즈', '🚪 나가기'], function (i) { [hallRent, hallGb, hallQuiz, npcBye][i](); });
+    }, first ? 'h' : 'n');
+  }
+  function hallMenuBack(emo) { npcBtns(['다른 용무가 있어요', '🚪 나가기'], function (i) { if (i === 0) hallGreet(false); else npcBye(); }); }
+  function hallRent() {
+    if (me.house && me.house.d) { npcSay('이미 ' + vName(me.house.d) + ' 마을에 임대주택이 있으시네요멍. 아래 [내 집으로] 버튼을 누르면 바로 갈 수 있어요.', hallMenuBack, 'n'); return; }
+    npcSay('임대주택 신청이군요! 이 마을 임대주택을 무료로 빌려 드려요멍. 창고도 쓰고 가구로 꾸밀 수도 있어요. 신청서를 써 드릴까요?', function () {
+      npcBtns(['✍ 신청할게요', '← 다음에 할게요'], function (i) {
+        if (i === 1) { hallGreet(false); return; }
+        npcSay('서류 확인 중… 이름 ' + (me.name || '시민') + ', 주소 ' + vName(VMODE) + '…', function () {
+          setTimeout(function () {
+            if (!NPC) return; applyRental(); npcGold();
+            if (me.house && me.house.d) { npcStamp(true); npcSay('쾅! 승인 도장 찍었어요멍! 이제 아래 [내 집으로] 버튼으로 집에 갈 수 있어요. 새 집 축하드려요!', hallMenuBack, 'h'); }
+            else npcSay('앗, 지금은 신청이 안 되네요멍… 잠시 뒤에 다시 와 주세요.', hallMenuBack, 'w');
+          }, 500);
+        }, 's');
+      });
+    }, 'n');
+  }
+  function hallGb() {
+    var a = gbList(VMODE), last = a.slice(-2).reverse().map(function (e) { return '"' + e.txt + '" - ' + e.n; }).join('  ');
+    npcSay(a.length ? '방명록에 글이 ' + a.length + '개 있어요멍. 최근 글: ' + last : '아직 방명록이 비어 있어요멍. 첫 번째 글을 남겨 주실래요?', function () {
+      var ch = $('npcCh'); ch.innerHTML = '<input id="npcIn" maxlength="40" placeholder="남길 말 (40자까지)"><button type="button" id="npcOk">남기기</button><button type="button" class="npcBack" id="npcNo">← 뒤로</button>';
+      $('npcNo').onclick = function (e) { e.stopPropagation(); hallGreet(false); };
+      $('npcOk').onclick = function (e) { e.stopPropagation(); if (gbWrite(VMODE, $('npcIn').value)) npcSay('소중한 글 고마워요멍! ' + vName(VMODE) + ' 방명록에 잘 남겼어요.', hallMenuBack, 'h'); else npcSay('남길 말을 먼저 적어 주세요멍.', hallGb, 'w'); };
+      $('npcIn').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); $('npcOk').click(); } });
+      setTimeout(function () { var i = $('npcIn'); if (i) i.focus(); }, 30);
+    }, 'n');
+  }
+
+  /* ----- O/X 퀴즈: 그 마을(읍·면·동) → 시·군·구 → 시·도 순서로 한 문제씩. 하루에 마을마다 한 번 ----- */
+  var SIDO_FULL = { '서울': '서울특별시', '부산': '부산광역시', '대구': '대구광역시', '인천': '인천광역시', '광주': '광주광역시', '대전': '대전광역시', '울산': '울산광역시', '세종': '세종특별자치시', '경기': '경기도', '강원': '강원특별자치도', '충북': '충청북도', '충남': '충청남도', '전북': '전북특별자치도', '전남': '전라남도', '경북': '경상북도', '경남': '경상남도', '제주': '제주특별자치도' };
+  /* [문제, 정답(O=true), 설명] */
+  var QZ_SIDO = {
+    '서울': [['경복궁은 서울에 있다', true, '경복궁은 서울 종로구에 있는 조선의 으뜸 궁궐이에요.'], ['서울은 바다와 맞닿아 있다', false, '서울에는 바다가 없어요. 대신 한강이 도시 한가운데를 흘러요.'], ['남산서울타워는 서울에 있다', true, '남산 꼭대기에 있는 서울의 상징 탑이에요.'], ['서울은 대한민국의 수도이다', true, '서울은 조선 시대부터 나라의 중심이었어요.']],
+    '부산': [['해운대 해수욕장은 부산에 있다', true, '해운대는 우리나라에서 가장 유명한 해수욕장 중 하나예요.'], ['부산에는 바다가 없다', false, '부산은 남해와 맞닿은 바닷가 항구 도시예요.'], ['자갈치시장은 부산의 유명한 수산시장이다', true, '싱싱한 생선이 가득한 시장이에요.'], ['부산은 서울 다음으로 인구가 많은 도시이다', true, '부산은 대한민국 제2의 도시예요.']],
+    '대구': [['대구는 산으로 둘러싸인 분지라 여름에 아주 덥다', true, "그래서 '대프리카'라는 별명도 있어요."], ['대구는 바닷가 도시이다', false, '대구는 내륙에 있어서 바다가 없어요.'], ['팔공산은 2023년 국립공원이 되었다', true, '팔공산은 대구와 경북에 걸친 산으로 23번째 국립공원이에요.'], ['대구·경북은 예부터 사과로 유명하다', true, '대구 사과는 옛날부터 이름났어요.']],
+    '인천': [['인천국제공항은 인천에 있다', true, '영종도에 있는 대한민국의 대표 공항이에요.'], ['강화도는 인천광역시에 속한다', true, '강화군은 인천광역시에 속해요.'], ['인천은 동해와 맞닿아 있다', false, '인천은 서해와 맞닿아 있어요.'], ['인천 차이나타운에는 짜장면박물관이 있다', true, '짜장면이 처음 만들어진 곳으로 알려져 있어요.']],
+    '광주': [['무등산은 광주를 대표하는 산이다', true, '무등산은 국립공원이에요.'], ['5·18 민주화운동은 광주에서 일어났다', true, '1980년 5월 광주에서 일어난 민주화운동이에요.'], ['광주광역시는 경상도 지역에 있다', false, '광주광역시는 전라도 지역에 있어요.']],
+    '대전': [['1993년 엑스포가 대전에서 열렸다', true, "대전 엑스포 '93은 우리나라에서 처음 열린 세계 박람회예요."], ["대전의 옛 이름은 '한밭'이다", true, "한밭은 '큰 밭'이라는 뜻이에요."], ['대전은 바다와 맞닿아 있다', false, '대전은 내륙 도시라 바다가 없어요.'], ['카이스트(KAIST)는 대전에 있다', true, '대덕연구단지가 있는 과학의 도시예요.']],
+    '울산': [['울산에는 큰 자동차 공장과 조선소가 있다', true, '울산은 대한민국의 대표 공업 도시예요.'], ['반구대 암각화에는 고래 그림이 새겨져 있다', true, '선사 시대 사람들이 바위에 고래 사냥 모습을 새겼어요.'], ['울산은 서해와 맞닿아 있다', false, '울산은 동해와 맞닿아 있어요.'], ['간절곶은 해돋이 명소이다', true, '간절곶은 우리나라 육지에서 해가 가장 먼저 뜨는 곳 중 하나예요.']],
+    '세종': [['세종특별자치시의 이름은 세종대왕에서 따왔다', true, '한글을 만든 세종대왕의 이름이에요.'], ['정부세종청사는 세종시에 있다', true, '여러 정부 부처가 모인 행정 도시예요.'], ['세종시는 바닷가에 있다', false, '세종시는 내륙에 있고 금강이 흘러요.']],
+    '경기': [['수원 화성은 경기도에 있다', true, '정조 임금 때 쌓은 성으로 유네스코 세계유산이에요.'], ['경기도는 서울을 둘러싸고 있다', true, '서울은 경기도 한가운데에 있어요.'], ['경기도에는 바다가 없다', false, '경기도 서쪽은 서해와 맞닿아 있어요.'], ['경기도는 우리나라에서 인구가 가장 많은 도이다', true, '경기도에는 1,300만 명이 넘게 살아요.']],
+    '강원': [['설악산은 강원도에 있다', true, '설악산은 단풍과 울산바위로 유명해요.'], ['2018년 동계 올림픽은 평창에서 열렸다', true, '평창·강릉·정선에서 경기가 열렸어요.'], ['강원도는 바다와 맞닿아 있지 않다', false, '강원도 동쪽은 동해와 맞닿아 있어요.'], ['강원도는 2023년 강원특별자치도가 되었다', true, '2023년 6월에 이름이 바뀌었어요.']],
+    '충북': [['충청북도는 바다와 맞닿아 있지 않다', true, '충북은 우리나라에서 유일하게 바다가 없는 도예요.'], ['충청북도의 도청은 청주에 있다', true, '청주는 충북에서 가장 큰 도시예요.'], ['단양 도담삼봉은 바다 위에 있는 섬이다', false, '도담삼봉은 남한강 위에 솟은 세 봉우리예요.'], ['속리산 법주사는 충청북도에 있다', true, '보은군에 있는 오래된 절이에요.']],
+    '충남': [['공주와 부여는 백제의 옛 수도였다', true, '웅진(공주)과 사비(부여)가 백제의 도읍이었어요.'], ['독립기념관은 충청남도 천안에 있다', true, '독립운동의 역사를 배울 수 있는 곳이에요.'], ['충청남도는 동해와 맞닿아 있다', false, '충남은 서해와 맞닿아 있어요.'], ['보령 머드축제는 진흙으로 노는 여름 축제이다', true, '대천해수욕장에서 열려요.']],
+    '전북': [['전주는 비빔밥으로 유명하다', true, '전주비빔밥은 우리나라 대표 음식이에요.'], ['새만금 방조제는 세계에서 가장 긴 방조제 중 하나이다', true, '길이가 약 33.9km나 돼요.'], ['전북은 2024년 전북특별자치도가 되었다', true, '2024년 1월에 출범했어요.'], ['전북은 동해와 맞닿아 있다', false, '전북은 서해와 맞닿아 있어요.']],
+    '전남': [['전라남도에는 우리나라에서 섬이 가장 많다', true, '전남에는 2천 개가 넘는 섬이 있어요.'], ['순천만 습지는 전라남도에 있다', true, '갈대밭과 철새로 유명해요.'], ['2012년 세계 박람회(엑스포)는 여수에서 열렸다', true, "주제는 '살아 있는 바다, 숨 쉬는 연안'이었어요."], ['전라남도의 도청은 광주광역시 안에 있다', false, '전남도청은 2005년에 무안군으로 옮겼어요.']],
+    '경북': [['경주는 신라의 수도였다', true, '천 년 동안 신라의 도읍이었어요.'], ['독도는 경상북도 울릉군에 속한다', true, '독도는 우리 땅이에요!'], ['안동 하회마을은 경상북도에 있다', true, '하회탈과 전통 한옥으로 유명해요.'], ['경상북도는 바다와 맞닿아 있지 않다', false, '경북 동쪽은 동해와 맞닿아 있어요.']],
+    '경남': [['경상남도의 도청은 창원에 있다', true, '창원은 경남에서 가장 큰 도시예요.'], ['진해 군항제는 벚꽃 축제로 유명하다', true, '봄마다 창원 진해구에서 열려요.'], ['이순신 장군의 한산도대첩은 통영 앞바다에서 있었다', true, '1592년 학익진으로 크게 이겼어요.'], ['경상남도는 서해와 맞닿아 있다', false, '경남은 남해와 맞닿아 있어요.']],
+    '제주': [['한라산은 남한에서 가장 높은 산이다', true, '높이가 1,947m예요.'], ['제주도는 화산 활동으로 만들어진 섬이다', true, '그래서 검은 현무암이 많아요.'], ['제주도와 육지는 다리로 이어져 있다', false, '제주도는 배나 비행기로 가야 해요.'], ['돌하르방은 제주도의 돌 할아버지 석상이다', true, '제주 사람들의 수호신 같은 존재예요.']]
+  };
+  var QZ_SGG = {
+    '충남 아산시': [['현충사는 이순신 장군을 기리는 곳으로 아산에 있다', true, '이순신 장군이 젊은 시절을 보낸 곳이에요.'], ['온양온천은 아산에 있다', true, '조선의 임금님들도 찾아왔던 오래된 온천이에요.'], ['외암민속마을은 아산에 있다', true, '송악면에 있는 돌담 마을로 500년이 넘었어요.'], ['아산시는 경상북도에 있다', false, '아산시는 충청남도에 있어요.']],
+    '충남 천안시': [['천안은 호두과자로 유명하다', true, '천안 호두과자는 휴게소 간식으로도 인기예요.'], ['독립기념관은 천안에 있다', true, '독립운동의 역사를 볼 수 있어요.'], ["민요 '천안삼거리'의 고장은 천안이다", true, '흥타령이 유명해요.']],
+    '경기 수원시': [['수원 화성은 정조 임금 때 쌓은 성이다', true, '1796년에 완성됐어요.'], ['수원 화성은 유네스코 세계유산이 아니다', false, '1997년에 세계유산이 되었어요.'], ['수원은 왕갈비로 유명하다', true, '수원 왕갈비는 수원의 대표 음식이에요.']],
+    '경북 경주시': [['첨성대는 경주에 있다', true, '신라 때 별을 관측하던 곳으로 알려져 있어요.'], ['불국사와 석굴암은 경주에 있다', true, '둘 다 유네스코 세계유산이에요.'], ['경주는 고구려의 수도였다', false, '경주는 신라의 수도였어요.']],
+    '전북 전주시': [['전주 한옥마을은 전주에 있다', true, '7백 채가 넘는 한옥이 모여 있어요.'], ['전주는 바닷가 도시이다', false, '전주는 내륙에 있어요.'], ['전주는 비빔밥으로 유명하다', true, '전주비빔밥은 전주의 대표 음식이에요.']],
+    '강원 강릉시': [['경포대는 강릉에 있다', true, '달맞이로 유명한 정자예요.'], ['강릉단오제는 유네스코 인류무형유산이다', true, '2005년에 등재됐어요.'], ['강릉은 서해와 맞닿아 있다', false, '강릉은 동해와 맞닿아 있어요.']],
+    '강원 춘천시': [['춘천은 닭갈비와 막국수로 유명하다', true, '춘천 닭갈비는 전국에서 유명해요.'], ['남이섬의 주소는 춘천시이다', true, '가평에서 배를 타고 가지만 주소는 춘천시 남산면이에요.'], ['춘천에는 강원특별자치도청이 있다', true, '춘천은 강원의 도청 소재지예요.']],
+    '강원 평창군': [['2018년 동계 올림픽 개회식은 평창에서 열렸다', true, '평창 올림픽 스타디움에서 열렸어요.']],
+    '강원 속초시': [['속초는 동해와 맞닿아 있다', true, '속초는 동해안의 항구 도시예요.'], ['속초에는 설악산으로 들어가는 길목이 있다', true, '설악동에서 설악산에 오를 수 있어요.']],
+    '경북 안동시': [['하회마을은 안동에 있다', true, '유네스코 세계유산이에요.'], ['안동은 찜닭으로 유명하다', true, '안동찜닭은 전국에서 사랑받는 음식이에요.'], ['하회탈은 안동에서 전해 온 탈이다', true, '하회별신굿탈놀이에서 써요.']],
+    '충남 공주시': [['무령왕릉은 공주에 있다', true, '백제 무령왕의 무덤이에요.'], ['공산성은 신라의 성이다', false, '공산성은 백제의 성이에요.']],
+    '충남 부여군': [['낙화암은 부여에 있다', true, '백마강(금강)이 내려다보이는 바위예요.'], ['정림사지 오층석탑은 백제의 탑이다', true, '백제 사비 시대의 석탑이에요.']],
+    '충남 보령시': [['보령 머드축제는 보령에서 열린다', true, '대천해수욕장에서 열려요.'], ['대천해수욕장은 보령에 있다', true, '서해안의 대표 해수욕장이에요.']],
+    '전남 여수시': [['2012년 엑스포는 여수에서 열렸다', true, '바다를 주제로 한 박람회였어요.'], ['여수는 바다와 맞닿아 있지 않다', false, "여수는 '여수 밤바다'로 유명한 항구 도시예요."]],
+    '전남 순천시': [['순천만 습지는 순천에 있다', true, '갈대와 철새로 유명해요.'], ['순천만국가정원은 순천에 있다', true, '우리나라 첫 번째 국가정원이에요.']],
+    '전남 목포시': [['유달산은 목포에 있다', true, '목포를 내려다볼 수 있는 산이에요.'], ['목포는 동해에 있는 항구 도시이다', false, '목포는 서해와 남해가 만나는 곳의 항구예요.']],
+    '경남 통영시': [['한산도는 통영에 속한다', true, '한산도대첩이 있었던 곳이에요.'], ['통영은 충무김밥으로 유명하다', true, '통영의 옛 이름이 충무였어요.']],
+    '경남 창원시': [['진해 군항제는 창원에서 열린다', true, '2010년부터 진해는 창원시 진해구예요.']],
+    '경기 파주시': [['임진각은 파주에 있다', true, '분단의 아픔과 평화를 생각하는 곳이에요.']],
+    '경기 이천시': [['이천은 쌀과 도자기로 유명하다', true, '이천 쌀은 임금님께 바치던 쌀이었대요.']],
+    '충북 청주시': [['현존하는 가장 오래된 금속활자본 직지는 청주에서 찍었다', true, '1377년 청주 흥덕사에서 찍었어요.']],
+    '충북 단양군': [['도담삼봉은 단양에 있다', true, '남한강 위에 솟은 세 봉우리예요.']],
+    '경북 포항시': [["호미곶에는 '상생의 손' 조형물이 있다", true, '바다 위로 손이 솟아 있는 해돋이 명소예요.'], ['포항에는 큰 제철소가 있다', true, '포항제철소는 우리나라 대표 제철소예요.']],
+    '부산 해운대구': [['해운대 해수욕장은 해운대구에 있다', true, '해운대구는 이름도 해수욕장에서 왔어요.']],
+    '서울 종로구': [['경복궁은 종로구에 있다', true, '광화문도 종로구에 있어요.'], ['종로구에는 청와대가 있다', true, '지금은 누구나 둘러볼 수 있게 열려 있어요.']],
+    '제주 제주시': [['제주국제공항은 제주시에 있다', true, '제주도의 하늘길 관문이에요.']],
+    '제주 서귀포시': [['천지연폭포는 서귀포에 있다', true, '밤에도 조명이 켜져 산책하기 좋아요.'], ['서귀포는 제주도 북쪽에 있다', false, '서귀포는 제주도 남쪽에 있어요.']]
+  };
+  /* 읍·면·동: '시군구 동이름' */
+  var QZ_DONG = {
+    '아산시 탕정면': [['탕정면에는 큰 디스플레이 공장이 있다', true, '탕정에는 TV·휴대폰 화면을 만드는 디스플레이 단지가 있어요.'], ['탕정면은 바다와 맞닿아 있다', false, '탕정면은 내륙에 있어서 바다가 없어요.'], ['탕정면은 아산시에 속한다', true, '탕정면은 충청남도 아산시의 면이에요.']],
+    '아산시 배방읍': [['KTX 천안아산역은 배방읍에 있다', true, '역 이름에 천안이 들어가지만 주소는 아산시 배방읍이에요.']],
+    '아산시 염치읍': [['현충사는 염치읍에 있다', true, '현충사 주소는 아산시 염치읍이에요.']],
+    '아산시 송악면': [['외암민속마을은 송악면에 있다', true, '돌담길이 예쁜 민속마을이에요.']],
+    '아산시 인주면': [['공세리성당은 인주면에 있다', true, '1890년대에 세워진 오래된 성당이에요.']]
+  };
+  function qzPick(a) { return a[(Math.random() * a.length) | 0]; }
+  function quizFor(v) {
+    var d = vDist(v), dn = vDong(v), sd = SIDO[SIDOI[d]] || '', full = SIDO_FULL[sd] || sd, here = mapName(d) || NAME[d] || '', sgg = SGG[d] || here, out = [], used = {};
+    function add(q) { if (q && !used[q[0]]) { used[q[0]] = 1; out.push({ q: q[0], a: q[1], e: q[2] }); return true; } return false; }
+    var same = []; for (var i = 1; i <= N; i++) if (i !== d && SIDOI[i] === SIDOI[d]) same.push(i);
+    /* 데이터로 만드는 문제 (언제나 맞는 사실) */
+    function gDong() {
+      if (!dn) return null;
+      if (Math.random() < 0.5 || !same.length) return ['지금 있는 ' + dn + npcJo(dn, '은', '는') + ' ' + here + '에 속한다', true, dn + npcJo(dn, '은', '는') + ' ' + full + ' ' + here + '에 있어요.'];
+      var o = mapName(qzPick(same)); return ['지금 있는 ' + dn + npcJo(dn, '은', '는') + ' ' + o + '에 속한다', false, dn + npcJo(dn, '은', '는') + ' ' + here + '에 속해요.'];
+    }
+    function gSido() {
+      if (METRO[sd] || sd === '세종') return null;
+      if (Math.random() < 0.5) return [sgg + npcJo(sgg, '은', '는') + ' ' + full + '에 있다', true, sgg + npcJo(sgg, '은', '는') + ' ' + full + '에 있어요.'];
+      var ks = Object.keys(SIDO_FULL).filter(function (k) { return k !== sd && !METRO[k] && k !== '세종'; }), o = SIDO_FULL[qzPick(ks)];
+      return [sgg + npcJo(sgg, '은', '는') + ' ' + o + '에 있다', false, sgg + npcJo(sgg, '은', '는') + ' ' + full + '에 있어요.'];
+    }
+    function gAdj() {
+      var nb = (adj[d] || []).filter(function (q) { return q !== d && NAME[q]; }); if (!nb.length) return null;
+      var nbN = nb.slice(0, 3).map(mapName).join(', ');
+      if (Math.random() < 0.5) { var b = mapName(qzPick(nb)); return [here + npcJo(here, '과', '와') + ' ' + b + npcJo(b, '은', '는') + ' 서로 맞닿아 있다', true, here + ' 바로 옆이 ' + b + '예요.']; }
+      var far = same.filter(function (q) { return nb.indexOf(q) < 0; }); if (!far.length) return null;
+      var f = mapName(qzPick(far)); return [here + npcJo(here, '과', '와') + ' ' + f + npcJo(f, '은', '는') + ' 서로 맞닿아 있다', false, here + npcJo(here, '과', '와') + ' 맞닿은 곳은 ' + nbN + ' 등이에요.'];
+    }
+    var cDong = QZ_DONG[sgg + ' ' + dn] || [], cSgg = QZ_SGG[NAME[d]] || [], cSido = QZ_SIDO[sd] || [];
+    /* 1번: 이 마을(읍·면·동) */
+    if (!(cDong.length && Math.random() < 0.75 && add(qzPick(cDong)))) { if (!add(gDong())) add(cSgg.length ? qzPick(cSgg) : gAdj()); }
+    /* 2번: 시·군·구 */
+    var t = 0; while (out.length < 2 && t++ < 8) add(cSgg.length && Math.random() < 0.7 ? qzPick(cSgg) : (Math.random() < 0.5 ? gAdj() : gSido()) || gAdj());
+    /* 3번: 시·도 */
+    t = 0; while (out.length < 3 && t++ < 8) add(cSido.length ? qzPick(cSido) : gAdj());
+    t = 0; while (out.length < 3 && t++ < 8) add(gAdj() || gSido() || gDong());
+    return out;
+  }
+  var QZ_G = 20, QZ_BONUS = 40;
+  function qzToday() { var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+  function qzDone(v) { var q = me.quiz; return !!(q && q.d === qzToday() && q.v && q.v[v]); }
+  function hallQuiz() {
+    var place = vName(VMODE);
+    if (qzDone(VMODE)) { npcSay('오늘은 ' + place + ' 퀴즈를 벌써 푸셨어요멍! 내일 다시 오시거나, 다른 마을 ' + '관공서에 가 보세요. 마을마다 문제가 달라요!', hallMenuBack, 'n'); return; }
+    npcSay(place + ' O/X 퀴즈! 이 동네에 관한 문제 3개예요. 맞히면 한 문제에 ' + QZ_G + '골드, 다 맞히면 보너스 ' + QZ_BONUS + '골드! 마을마다 하루에 한 번이에요멍. 시작할까요?', function () {
+      npcBtns(['▶ 시작!', '← 다음에 할게요'], function (i) {
+        if (i === 1) { hallGreet(false); return; }
+        var Q = quizFor(VMODE); if (!Q.length) { npcSay('앗, 지금은 낼 문제가 없네요멍…', hallMenuBack, 'w'); return; }
+        if (!me.quiz || me.quiz.d !== qzToday()) me.quiz = { d: qzToday(), v: {} }; me.quiz.v[VMODE] = 1; saveMe();   /* 시작하면 오늘 기록 (나갔다 와서 다시 풀기 방지) */
+        var k = 0, right = 0, earned = 0;
+        function ask() {
+          if (!NPC) return;
+          if (k >= Q.length) {
+            if (right === Q.length) { me.res.g = (me.res.g || 0) + QZ_BONUS; earned += QZ_BONUS; saveMe(); npcGold(); renderDock(); }
+            var msg = right === Q.length ? '와아, 만점이에요멍! 보너스 ' + QZ_BONUS + 'G까지 해서 모두 ' + earned + '골드를 드렸어요. ' + place + ' 박사님이시네요!' : right ? Q.length + '문제 중 ' + right + '문제 맞혔어요멍! ' + earned + '골드를 드렸어요. 다른 마을 퀴즈도 도전해 보세요!' : '아쉽게도 하나도 못 맞혔어요멍… 다른 마을에서 다시 도전해 보세요!';
+            npcSay(msg, hallMenuBack, right ? 'h' : 'w'); return;
+          }
+          var q = Q[k];
+          npcSay('제' + (k + 1) + '문제! ' + q.q + '. 맞으면 O, 틀리면 X!', function () {
+            npcBtns(['⭕ 맞다', '❌ 아니다'], function (ans) {
+              var ok = (ans === 0) === q.a; npcStamp(ok); k++;
+              if (ok) { right++; earned += QZ_G; me.res.g = (me.res.g || 0) + QZ_G; saveMe(); npcGold(); renderDock(); }
+              npcSay((ok ? '딩동댕! 정답이에요멍! +' + QZ_G + 'G  ' : '땡! 정답은 ' + (q.a ? 'O' : 'X') + '예요멍.  ') + q.e, function () { npcBtns([k < Q.length ? '다음 문제' : '결과 보기'], ask); }, ok ? 'h' : 'w');
+            });
+          }, 'n');
+        }
+        ask();
+      });
+    }, 's');
+  }
+
+  /* ===== 낚시점 (달봉 사장) ===== */
+  function fishGreet(first) {
+    npcSay(first ? '어서 와! 달봉이네 낚시점이야. 오늘 물때가 아주 좋아~ 뭐 줄까?' : '또 필요한 거 있어? 아, 그리고 하나 알려 줄게. ' + qzPick(FISH_TIPS), function () {   /* 두 번째부터는 낚시 팁을 하나씩 들려준다 */
+      npcBtns(['🎣 낚시대 사기', '💰 낚시대 팔기', '🐟 물고기 팔기', '🚪 나가기'], function (i) { [fishRods, fishRodSell, fishSell, npcBye][i](); });
+    }, first ? 'h' : 'n');
+  }
+  function fishBack() { npcBtns(['다른 것도 볼래요', '🚪 나가기'], function (i) { if (i === 0) fishGreet(false); else npcBye(); }); }
+  function fishRods() {
+    npcSay('낚시대는 이 네 가지가 있어. 좋은 낚시대일수록 멀리 던지고, 귀한 물고기가 잘 물지! 어떤 걸 보여 줄까?', function () {
+      npcBtns(ROD_IDS.map(function (id) { return ITM[id].n + ' · ' + ROD[id].p + 'G'; }).concat(['← 뒤로']), function (i) {
+        if (i >= ROD_IDS.length) { fishGreet(false); return; }
+        var id = ROD_IDS[i], pr = ROD[id].p, tip = (ITM[id].d.split(' · ')[1] || '').replace(/요$/, '');
+        npcSay(ITM[id].n + '은 사거리가 ' + ROD[id].r + '칸이야. ' + (tip ? tip + '지. ' : '') + '내구도는 300! 값은 ' + pr + '골드인데, 살래?', function () {
+          npcBtns(['💰 살게요 (' + pr + 'G)', '← 다른 거 볼래요'], function (j) {
+            if (j === 1) { fishRods(); return; }
+            var have = me.res.g || 0;
+            if (have < pr) { npcSay('어이쿠, ' + (pr - have) + '골드가 모자라네. 물고기 잡아서 나한테 팔면 금방 모을 거야!', fishBack, 'w'); return; }
+            me.res.g = have - pr; var left = invAdd(id, 1); if (left > 0) gitAdd(me.cell, id, left);
+            saveMe(); ivSig = ''; renderInv(); renderDock(); npcGold(); npcStamp(true);
+            npcSay(left > 0 ? '좋은 선택이야! 가방이 꽉 차서 발밑에 놓아 줬어. 꼭 챙겨 가!' : '좋은 선택이야! 가방에 넣어 줬어. 물가에서 아래 [낚시] 버튼으로 던져 봐!', fishBack, 'h');
+          });
+        }, 'n');
+      });
+    }, 'n');
+  }
+  function fishSell() {
+    var v = inv(); if (!v) { npcSay('가방이 없네? 가방부터 챙겨 와!', fishBack, 'w'); return; }
+    var isF = function (o) { var t = ITM[o.id] && ITM[o.id].t; return t === '민물고기' || t === '바닷물고기'; };
+    var fish = v.items.filter(isF), cnt = {}, total = 0;
+    fish.forEach(function (o) { cnt[o.id] = (cnt[o.id] || 0) + (o.n || 1); total += (o.n || 1) * (ITM[o.id].v || 1); });
+    if (!fish.length) { npcSay('가방에 물고기가 한 마리도 없는걸? 강이나 바다에서 [낚시]로 잡아 와. 내가 좋은 값에 사 줄게!', fishBack, 'w'); return; }
+    var list = Object.keys(cnt).map(function (id) { return ITM[id].n + ' ' + cnt[id] + '마리'; }), rare = cnt.gcarp || cnt.tuna;
+    npcSay((rare ? '우와, 이거 진짜야?! ' : '음~ 어디 보자. ') + list.join(', ') + '… 전부 ' + total + '골드 쳐 줄게. 팔래?', function () {
+      npcBtns(['💰 다 팔게요 (+' + total + 'G)', '← 아니요, 가지고 있을래요'], function (i) {
+        if (i === 1) { fishGreet(false); return; }
+        v.items = v.items.filter(function (o) { return !isF(o); }); me.res.g = (me.res.g || 0) + total;
+        saveMe(); ivSig = ''; renderInv(); renderDock(); npcGold(); npcStamp(true);
+        npcSay('거래 완료! ' + total + '골드 여기 있어. 싱싱한 걸로 또 부탁해~', fishBack, 'h');
+      });
+    }, rare ? 's' : 'n');
+  }
+  var FISH_TIPS = ['강이나 개울에선 피라미·붕어·잉어가, 바다에선 고등어·갈치·광어가 잘 잡혀.', '좋은 낚시대일수록 비싼 물고기가 잘 물어. 고급 낚시대면 도미나 참치도 노려 볼 만하지!', '황금 잉어는 아주아주 드물게 잡혀. 잡으면 나한테 꼭 보여 줘!', '낚시대도 쓰면 닳아. 내구도가 줄면 가방에서 수리할 수 있어.', '가끔 낡은 장화가 걸려 올라와. 하하, 그것도 낚시의 재미지!', '물가 바로 앞에서 아래 [낚시] 버튼을 눌러. 사거리가 긴 낚시대면 좀 떨어져서도 던질 수 있어.'];
+  /* 낚시대 팔기: 가방 · 손에 든 낚시대. 값 = 산 값의 절반 × 남은 내구도 비율 (최소 1G) */
+  function rodSellPrice(o) { var r = Number.isFinite(o.dur) ? Math.max(0, Math.min(1, o.dur / (o.durMax || 300))) : 1; return Math.max(1, Math.floor(ROD[o.id].p / 2 * r)); }
+  function fishRodSell() {
+    var v = inv(); if (!v) { npcSay('가방이 없네? 가방부터 챙겨 와!', fishBack, 'w'); return; }
+    var L = [];
+    (v.hands || []).forEach(function (o, h) { if (o && ROD[o.id]) L.push({ o: o, h: h }); });
+    v.items.forEach(function (o) { if (o && ROD[o.id]) L.push({ o: o, h: -1 }); });
+    if (!L.length) { npcSay('팔 낚시대가 없는걸? 가방이나 손에 낚시대가 있어야 사 줄 수 있어.', fishBack, 'w'); return; }
+    npcSay('낚시대를 팔려고? 산 값의 절반에, 많이 닳았으면 그만큼 깎아서 사 줄게. 어떤 걸 팔래?', function () {
+      npcBtns(L.map(function (e) { var o = e.o; return (e.h >= 0 ? '✋ ' : '') + ITM[o.id].n + (Number.isFinite(o.dur) ? ' (' + Math.round(o.dur) + '/' + (o.durMax || 300) + ')' : '') + ' · ' + rodSellPrice(o) + 'G'; }).concat(['← 뒤로']), function (i) {
+        if (i >= L.length) { fishGreet(false); return; }
+        var e = L[i], pr = rodSellPrice(e.o);
+        npcSay(ITM[e.o.id].n + (e.h >= 0 ? '(손에 든 것)' : '') + '이면 ' + pr + '골드 쳐 줄게. 정말 팔래?', function () {
+          npcBtns(['💰 팔게요 (+' + pr + 'G)', '← 아니요'], function (j) {
+            if (j === 1) { fishRodSell(); return; }
+            if (e.h >= 0) { if (v.hands[e.h] !== e.o) { fishRodSell(); return; } v.hands[e.h] = null; }
+            else { var k = v.items.indexOf(e.o); if (k < 0) { fishRodSell(); return; } v.items.splice(k, 1); }
+            me.res.g = (me.res.g || 0) + pr; saveMe(); ivSig = ''; renderInv(); renderDock(); npcGold(); npcStamp(true);
+            npcSay('거래 완료! ' + pr + '골드 여기 있어. 잘 손질해서 다음 손님한테 팔아야지~', fishBack, 'h');
+          });
+        }, 'n');
+      });
+    }, 'n');
+  }
+
+  /* ===== 그림: 원근(소실점) 방 · 명암 · 초상 ===== */
+  function npcLoop(now) {
+    if (!NPC) return; NPC.raf = requestAnimationFrame(npcLoop);
+    var tk = Math.floor((now - NPC.t0) / 110);
+    if (tk === NPC.tick && NPC.bgKey) return; NPC.tick = tk;
+    var cv = $('npcBg'), F = PXA.fit(cv, 2), key = F.W + 'x' + F.H + NPC.k;
+    if (key !== NPC.bgKey) { NPC.bgKey = key; NPC.base = npcRoom(NPC.k, F.W, F.H); }
+    F.c.drawImage(NPC.base.cv, 0, 0); npcAnim(F.c, NPC.base, tk);
+    /* 초상: 눈 깜빡 · 말할 때 입 */
+    if (!NPC.blinkAt) NPC.blinkAt = now + 2000 + Math.random() * 2500;
+    var blink = now > NPC.blinkAt; if (now > NPC.blinkAt + 140) NPC.blinkAt = now + 2200 + Math.random() * 2800;
+    var pc = $('npcCv').getContext('2d'); (NPC.k === 'hall' ? dogPortrait : otterPortrait)(pc, NPC.emo, NPC.talk && (tk % 2 === 0), blink);
+  }
+  /* 방 한 칸: 소실점(VX,VY) · 뒷벽 사각형 · 천장/바닥/옆벽은 소실점으로 모이는 사다리꼴. 바닥·천장·옆벽 무늬는 원근 좌표(깊이)로 계산 */
+  function npcRoom(k, W, H) {
+    var cv = document.createElement('canvas'); cv.width = W; cv.height = H; var c = cv.getContext('2d'), R = function (x, y, w, h, col) { c.fillStyle = col; c.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); };
+    var CY = Math.round(H * 0.46), VX = W / 2, bw = Math.max(80, Math.min(W * 0.62, H * 0.9)), bx0 = Math.round(VX - bw / 2), bx1 = Math.round(VX + bw / 2), by0 = Math.round(CY * 0.14), by1 = Math.round(CY * 0.84), VY = Math.round(by0 + (by1 - by0) * 0.55);
+    var img = c.createImageData(W, H), D = img.data, hall = k === 'hall', x, y, iT = bw / W;   /* iT = 1/tMax: 화면 가장자리의 1/t */
+    function mix(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; }
+    function fr(v) { return v - Math.floor(v); }
+    var hs = PXA.hs;
+    for (y = 0; y < H; y++) for (x = 0; x < W; x++) {
+      var col, lit = 1, side = x < bx0 ? -1 : x > bx1 ? 1 : 0, t = side ? (side < 0 ? (VX - x) / (VX - bx0) : (x - VX) / (bx1 - VX)) : 1;
+      var top = VY + t * (by0 - VY), bot = VY + t * (by1 - VY), n = hs(x, y) * 0.06 - 0.03;
+      if (y < top) {   /* 천장 */
+        var cz = (VY - by0) / (VY - y), cx = (x - VX) * cz / bw;   /* cz: 1 = 뒷벽, 작을수록 가깝다 */
+        if (hall) { col = [226, 222, 212]; var pu = fr(cx * 3 + 0.5), pv = fr(1 / cz * 0.9); if (pu > 0.18 && pu < 0.82 && pv > 0.15 && pv < 0.55) col = [255, 252, 236]; else if (pu > 0.12 && pu < 0.88 && pv > 0.08 && pv < 0.62) col = [205, 202, 194]; lit = 0.86 + 0.14 * cz; }
+        else { var bm = fr(cx * 4 + 0.5); col = bm < 0.16 ? [74, 46, 26] : bm < 0.2 ? [120, 80, 46] : [98, 64, 38]; if (fr(1 / cz * 0.7) < 0.08) col = [58, 36, 20]; lit = 0.55 + 0.35 * cz; }
+      } else if (y > bot) {   /* 바닥 */
+        var fz = (by1 - VY) / (y - VY), fx = (x - VX) * fz / bw;
+        if (hall) { var ti = (Math.floor(fx * 6) + Math.floor(1 / fz * 3)) & 1; col = ti ? [206, 200, 188] : [184, 178, 166]; if (fr(fx * 6) < 0.04 || fr(1 / fz * 3) < 0.05) col = [160, 154, 142]; var refl = Math.max(0, 1 - Math.abs(fx) * 2.2) * Math.max(0, fz - 0.3) * 0.5; col = mix(col, [250, 248, 236], refl); lit = 0.75 + 0.25 * fz; }
+        else { var pl = fr(fx * 7); col = pl < 0.06 ? [70, 44, 24] : (Math.floor(fx * 7) & 1) ? [140, 96, 58] : [128, 86, 50]; if (fr(1 / fz * 0.8 + Math.floor(fx * 7) * 0.37) < 0.03) col = [80, 52, 30]; lit = 0.6 + 0.35 * fz; }
+      } else if (side) {   /* 옆벽 */
+        var wv = (y - top) / (bot - top), wz = 1 / t, q = (wz - iT) / (1 - iT);   /* wv: 0 위 ~ 1 아래 · q: 0 = 화면 가장자리 ~ 1 = 뒷벽 모서리 (깊이에 비례) */
+        if (hall) {
+          col = side < 0 ? [222, 212, 190] : [214, 204, 184];
+          if (wv > 0.72) { col = [150, 104, 64]; if (wv < 0.74) col = [190, 146, 96]; if (fr(q * 10) < 0.06) col = [118, 80, 48]; }
+          if (side < 0) { var wu = fr(q * 2); if (wv > 0.14 && wv < 0.6 && wu > 0.2 && wu < 0.8) { col = mix([150, 200, 236], [220, 240, 252], 1 - (wv - 0.14) / 0.46); if (Math.abs(wu - 0.5) < 0.03 || Math.abs(wv - 0.37) < 0.015) col = [120, 120, 118]; } else if (wv > 0.12 && wv < 0.62 && wu > 0.17 && wu < 0.83) col = [176, 172, 164]; }
+          else { var bu = q; if (wv > 0.2 && wv < 0.55 && bu > 0.25 && bu < 0.75) { col = [176, 132, 86]; var pid = Math.floor(bu * 10) + Math.floor(wv * 12) * 3; if (fr(bu * 5) > 0.15 && fr(wv * 6) > 0.2 && hs(pid, 9) > 0.35) col = [[250, 246, 230], [255, 236, 150], [190, 226, 250], [250, 200, 210]][(hs(pid, 3) * 4) | 0]; } }
+          lit = 0.72 + 0.28 * wz;
+        } else {
+          var pp = fr(wv * 9 + 0.0); col = pp < 0.08 ? [84, 52, 28] : (Math.floor(wv * 9) & 1) ? [150, 100, 58] : [138, 92, 52];
+          if (side > 0) { var au = q; if (wv > 0.3 && wv < 0.68 && au > 0.15 && au < 0.85) { var dep = (wv - 0.3) / 0.38; col = mix([90, 190, 210], [24, 86, 130], dep); if (wv > 0.62) col = [196, 170, 110]; if (au < 0.19 || au > 0.81 || wv < 0.32) col = [60, 70, 80]; } }
+          lit = 0.58 + 0.34 * wz;
+        }
+      } else {   /* 뒷벽 */
+        var u = (x - bx0) / bw, v = (y - by0) / (by1 - by0);
+        if (hall) { col = [238, 230, 210]; if (v > 0.7) { col = [158, 110, 68]; if (v < 0.725) col = [196, 150, 100]; if (fr(u * 14) < 0.05) col = [126, 86, 52]; } lit = 1 - Math.abs(u - 0.5) * 0.18; }
+        else { var vp = fr(u * 18); col = vp < 0.07 ? [80, 50, 28] : (Math.floor(u * 18) & 1) ? [158, 108, 64] : [146, 98, 58]; lit = 0.8 - Math.abs(u - 0.5) * 0.25; }
+      }
+      /* 모서리 그늘 + 화면 가장자리 어둡게 */
+      var ex = Math.abs(x / W - 0.5) * 2, ey = y / H; lit *= 1 - ex * ex * 0.22 - (hall ? 0 : ey * 0.1);
+      if (Math.abs(x - bx0) < 1 && y >= by0 && y <= by1 || Math.abs(x - bx1) < 1 && y >= by0 && y <= by1) lit *= 0.82;
+      lit += n; var p = (y * W + x) * 4; D[p] = Math.max(0, Math.min(255, col[0] * lit)); D[p + 1] = Math.max(0, Math.min(255, col[1] * lit)); D[p + 2] = Math.max(0, Math.min(255, col[2] * lit)); D[p + 3] = 255;
+    }
+    c.putImageData(img, 0, 0);
+    /* 뒷벽 위·아래 경계선 (몰딩) */
+    R(bx0, by0, bw, 2, hall ? '#c8bea6' : '#5a3820'); R(bx0, by1 - 1, bw, 2, hall ? '#8a6a48' : '#4a2c16');
+    var G = { iT: iT, W: W, H: H, CY: CY, bx0: bx0, bx1: bx1, by0: by0, by1: by1, bw: bw, VX: VX, VY: VY, cv: cv };
+    var wy = function (v) { return by0 + (by1 - by0) * v; }, wx = function (u) { return bx0 + bw * u; };
+    if (hall) {
+      /* 태극기 (뒷벽 왼쪽 위) — 공식 비율: 가로:세로 = 3:2, 태극 지름 = 세로의 1/2, 4괘는 대각선 위 (건☰ 왼쪽 위 · 곤☷ 오른쪽 아래 · 감☵ 오른쪽 위 · 리☲ 왼쪽 아래) */
+      var fw = Math.max(48, Math.min(108, Math.round(bw * 0.27))), fh = Math.round(fw * 2 / 3), fx0 = Math.round(wx(0.045)), fy0 = Math.round(wy(0.07));
+      R(fx0 - 2, fy0 - 2, fw + 4, fh + 4, '#6a4a2a'); R(fx0 - 2, fy0 - 2, fw + 4, 1, '#9a7448'); R(fx0 + fw + 2, fy0, 2, fh + 4, 'rgba(0,0,0,.22)'); R(fx0, fy0 + fh + 2, fw + 4, 2, 'rgba(0,0,0,.22)');
+      (function () {
+        var L = Math.hypot(3, 2), dX = -3 / L, dY = -2 / L, nX = 2 / L, nY = -3 / L;   /* d: 건 쪽(왼쪽 위) 대각선 · n: 그에 수직 (오른쪽 위 = 빨강 쪽) */
+        var GUA = [[dX, dY, [1, 1, 1]], [-dX, -dY, [0, 0, 0]], [3 / L, -2 / L, [0, 1, 0]], [-3 / L, 2 / L, [1, 0, 1]]];   /* [방향x, 방향y, 효(1 = 긴 막대, 0 = 끊긴 막대) 가운데에서 바깥 순서] */
+        var PAL = { w: [251, 251, 248], r: [205, 46, 58], b: [0, 71, 160], k: [17, 17, 17] };
+        function at(X, Y) {   /* 세로 = 1 단위 좌표의 색 */
+          var r = 0.25;
+          if (X * X + Y * Y <= r * r) {
+            var red = X * nX + Y * nY >= 0, c1x = dX * r / 2, c1y = dY * r / 2;
+            if ((X - c1x) * (X - c1x) + (Y - c1y) * (Y - c1y) <= r * r / 4) red = true;
+            if ((X + c1x) * (X + c1x) + (Y + c1y) * (Y + c1y) <= r * r / 4) red = false;
+            return red ? 'r' : 'b';
+          }
+          for (var gi = 0; gi < 4; gi++) {
+            var ex = GUA[gi][0], ey = GUA[gi][1], along = X * ex + Y * ey, across = X * -ey + Y * ex, s0 = 0.375;
+            if (along < s0 || along > s0 + 1 / 6 || Math.abs(across) > 0.125) continue;
+            var o = along - s0, k = o < 1 / 24 ? 0 : o >= 1 / 24 + 1 / 48 && o < 2 / 24 + 1 / 48 ? 1 : o >= 2 / 24 + 2 / 48 ? 2 : -1;
+            if (k >= 0 && !(GUA[gi][2][k] === 0 && Math.abs(across) < 1 / 48)) return 'k';
+          }
+          return 'w';
+        }
+        for (var py = 0; py < fh; py++) for (var px = 0; px < fw; px++) {
+          var acc = [0, 0, 0], SS = 4;   /* 4x4 표본을 섞어 가장자리를 매끈하게 */
+          for (var sy = 0; sy < SS; sy++) for (var sx = 0; sx < SS; sx++) { var pc = PAL[at((px + (sx + 0.5) / SS - fw / 2) / fh, (py + (sy + 0.5) / SS - fh / 2) / fh)]; acc[0] += pc[0]; acc[1] += pc[1]; acc[2] += pc[2]; }
+          var col = 'rgb(' + Math.round(acc[0] / 16) + ',' + Math.round(acc[1] / 16) + ',' + Math.round(acc[2] / 16) + ')';
+          R(fx0 + px, fy0 + py, 1, 1, col);
+        }
+      })();
+      R(fx0, fy0, fw, 1, 'rgba(255,255,255,.5)');
+      /* 시계 (뒷벽 가운데 위): 테두리 · 흰 판 · 12 눈금 (3·6·9·12는 길게). 바늘은 npcAnim 에서 지금 시각대로 */
+      var cr = Math.max(10, Math.min(20, Math.round(bw * 0.06))), dRight = Math.round(wx(0.92) - Math.max(26, Math.round(bw * 0.2))), ccx = Math.round((fx0 + fw + 2 + dRight - 2) / 2), ccy = by0 + cr + 5;   /* 태극기와 번호표 전광판 사이 가운데 */
+      cr = Math.min(cr, Math.floor((dRight - fx0 - fw - 8) / 2));
+      PXA.disc(c, ccx + 2, ccy + 2, cr + 2, 'rgba(0,0,0,.22)'); PXA.disc(c, ccx, ccy, cr + 2, '#3a3a42'); PXA.disc(c, ccx, ccy, cr + 1, '#6a6a74'); PXA.disc(c, ccx, ccy, cr, '#fffdf4');
+      PXA.ell(c, ccx - Math.round(cr * 0.3), ccy - Math.round(cr * 0.45), Math.round(cr * 0.45), Math.max(1, Math.round(cr * 0.18)), '#ffffff');
+      for (var hk = 0; hk < 12; hk++) { var ha0 = hk / 12 * Math.PI * 2, major = hk % 3 === 0, l0 = cr - (major ? Math.max(3, Math.round(cr * 0.28)) : Math.max(2, Math.round(cr * 0.14))); for (var rr = l0; rr < cr - 0.5; rr += 0.5) { R(Math.round(ccx + Math.sin(ha0) * rr), Math.round(ccy - Math.cos(ha0) * rr), major && cr >= 14 ? 2 : 1, 1, '#2a2a30'); } }
+      G.clock = [ccx, ccy, cr];
+      /* 번호표 전광판 (뒷벽 오른쪽 위) */
+      var dw = Math.max(26, Math.round(bw * 0.2)), dh = Math.max(10, Math.round(dw * 0.4)), dx0 = Math.round(wx(0.92) - dw), dy0 = Math.round(wy(0.1));
+      R(dx0 - 2, dy0 - 2, dw + 4, dh + 4, '#3a3a40'); R(dx0, dy0, dw, dh, '#120c0c'); R(dx0 - 2, dy0 + dh + 2, dw + 4, 1, 'rgba(0,0,0,.25)'); G.disp = [dx0, dy0, dw, dh];
+      /* 대기 의자 (뒷벽 앞 바닥) */
+      [[0.04, 0.3], [0.7, 0.96]].forEach(function (q) { var sx = wx(q[0]), ex2 = wx(q[1]), sy = by1 + 1, sw = Math.max(3, Math.round(bw * 0.035)); for (var xx = sx; xx + sw <= ex2; xx += sw + 1) { R(xx, sy - sw - 1, sw, sw, '#3a6ab8'); R(xx, sy - sw - 1, sw, 1, '#6a9ae0'); R(xx, sy - 1, sw, 2, '#2a4a88'); R(xx, sy + 1, sw, 1, 'rgba(0,0,0,.25)'); } R(sx, sy + 1, ex2 - sx, 1, '#707070'); });
+      /* 화분 (양쪽 구석) */
+      [[bx0 + 3, 1], [bx1 - 9, -1]].forEach(function (q) { var px = q[0], py = by1 + 2; R(px, py - 6, 7, 6, '#b86a3a'); R(px, py - 6, 7, 1, '#d88a5a'); for (var j = 0; j < 9; j++) PXA.disc(c, px + 3 + Math.round(Math.sin(j * 1.7) * 3), py - 9 - j * 1.4, 2, j % 2 ? '#3a9a4a' : '#5ab85a'); });
+      /* 창 빛줄기 (왼쪽 창에서 바닥으로) */
+      for (y = by1; y < CY + 4; y++) { var spread = (y - by1) * 0.8; c.fillStyle = 'rgba(255,248,214,' + (0.16 * (1 - (y - by1) / (CY + 4 - by1))).toFixed(3) + ')'; c.fillRect(Math.round(bx0 * 0.2 + spread * 0.3), y, Math.round(bx0 * 0.6 + spread), 1); }
+      /* 천장 조명 빛 웅덩이 (뒷벽 앞 바닥) */
+      [[0.25, 0.08], [0.75, 0.08], [0.5, 0.1]].forEach(function (q) { PXA.ell(c, wx(q[0]), by1 + 6, Math.round(bw * 0.12), 3, 'rgba(255,250,230,' + q[1] + ')'); });
+    } else {
+      /* 창문: 바다 · 하늘 (뒷벽 오른쪽 위) */
+      var ww = Math.max(26, Math.round(bw * 0.3)), wh = Math.max(14, Math.round((by1 - by0) * 0.34)), wx0 = Math.round(wx(0.62)), wy0 = Math.round(wy(0.08));
+      R(wx0 - 3, wy0 - 3, ww + 6, wh + 6, '#4a2c16'); G.win = [wx0, wy0, ww, wh];
+      R(wx0 - 5, wy0 + wh + 3, ww + 10, 3, '#7a4e2c'); R(wx0 - 5, wy0 + wh + 3, ww + 10, 1, '#a87444');
+      /* 구명환 (뒷벽 왼쪽) */
+      var lr = Math.max(5, Math.round(bw * 0.05)), lcx = Math.round(wx(0.14)), lcy = Math.round(wy(0.24));
+      for (y = -lr; y <= lr; y++) for (x = -lr; x <= lr; x++) { var dd = Math.sqrt(x * x + y * y); if (dd > lr || dd < lr * 0.5) continue; var ang = Math.atan2(y, x), seg = Math.floor((ang + Math.PI) / (Math.PI / 2)); R(lcx + x, lcy + y, 1, 1, seg % 2 ? '#f4f0e8' : '#e03a2a'); if (y < -lr * 0.6) R(lcx + x, lcy + y, 1, 1, 'rgba(255,255,255,.25)'); }
+      R(lcx - 1, lcy - lr - 3, 2, 3, '#d8c890');
+      /* 물고기 간판 (뒷벽 가운데 위) */
+      var sx0 = Math.round(wx(0.32)), sw2 = Math.max(20, Math.round(bw * 0.24)), sy0 = Math.round(wy(0.08)), sh = Math.max(8, Math.round(sw2 * 0.34));
+      R(sx0 - 1, sy0 - 1, sw2 + 2, sh + 2, '#3a2010'); R(sx0, sy0, sw2, sh, '#2f7fc0'); R(sx0, sy0, sw2, 1, '#6ab0e8');
+      PXA.ell(c, sx0 + sw2 * 0.45, sy0 + sh / 2, Math.round(sw2 * 0.28), Math.round(sh * 0.3), '#f8d050'); for (y = -Math.round(sh * 0.3); y <= Math.round(sh * 0.3); y++) R(sx0 + sw2 * 0.72, sy0 + sh / 2 + y, Math.round(sh * 0.3) - Math.abs(y) + 1, 1, '#f8d050'); R(sx0 + sw2 * 0.28, sy0 + sh / 2 - 1, 1, 1, '#2a1a0a');
+      /* 그물 (천장 앞쪽에 처진 그물 + 부표) */
+      for (x = 0; x < W; x++) { var sag = Math.round(Math.sin(x / W * Math.PI) * H * 0.05); R(x, sag + 2, 1, 1, '#c8b890'); if (x % 7 === 0) for (y = 0; y < sag + 2; y++) if ((y + x) % 3 === 0) R(x, y, 1, 1, 'rgba(200,184,144,.6)'); }
+      for (x = 8; x < W; x += 26) { var sg = Math.round(Math.sin(x / W * Math.PI) * H * 0.05) + 3; PXA.disc(c, x, sg + 2, 2, x % 52 < 26 ? '#e85a2a' : '#f4d040'); R(x - 1, sg + 1, 1, 1, '#fff'); }
+      /* 랜턴 빛 */
+      [[46, 0.04], [30, 0.05], [18, 0.07]].forEach(function (q) { PXA.disc(c, W * 0.5, by0 + 6, Math.round(q[0] * bw / 200), 'rgba(255,200,110,' + q[1] + ')'); });
+      /* 바닥 통 · 아이스박스 (뒷벽 앞) */
+      var bx = wx(0.06), bfy = by1 + 2; R(bx, bfy - 9, 8, 9, '#4a6a8a'); R(bx, bfy - 9, 8, 1, '#7a9aba'); R(bx + 1, bfy - 6, 6, 1, '#3a5068'); R(bx + 1, bfy - 3, 6, 1, '#3a5068');
+      var ix = wx(0.82); R(ix, bfy - 8, 12, 8, '#f0f4f8'); R(ix, bfy - 8, 12, 2, '#3a7ac0'); R(ix + 4, bfy - 5, 4, 1, '#a0b0c0');
+    }
+    /* 옆벽: 시청 = 창 앞 화분 없음 · 낚시점 = 왼벽 낚시대 걸이, 오른벽 수조 안 물고기는 애니메이션 */
+    if (!hall) {
+      for (var ri = 0; ri < 8; ri++) { var rq = 0.08 + ri * 0.11, rt = 1 / (rq * (1 - iT) + iT), rx = Math.round(VX - (VX - bx0) * rt); if (rx < 2 || rx > bx0 - 2) continue; var rtop = VY + rt * (by0 - VY), rbot = VY + rt * (by1 - VY), rh = rbot - rtop; R(rx, rtop + rh * 0.08, 1, rh * 0.8, ['#2a2a2a', '#c83a2a', '#3a6ac0', '#e8c040', '#2a8a4a'][ri % 5]); R(rx + 1, rtop + rh * 0.08, 1, rh * 0.8, 'rgba(255,255,255,.2)'); PXA.disc(c, rx + 1, rtop + rh * 0.62, Math.max(1, Math.round(2 * rt)), '#9aa0a8'); }
+    }
+    /* ---- 계산대 (앞) ---- */
+    var TT = Math.max(6, Math.round(H * 0.022)), FY0 = CY + TT + 3;
+    if (hall) {
+      /* 아크릴 칸막이: 양쪽 (가운데는 열려 있다) */
+      var gh = Math.round(H * 0.12), gw = Math.round(W * 0.2);
+      [[Math.round(W * 0.04), gw], [Math.round(W * 0.96 - gw), gw]].forEach(function (q) { c.fillStyle = 'rgba(210,236,250,.22)'; c.fillRect(q[0], CY - gh, q[1], gh); R(q[0], CY - gh, q[1], 1, 'rgba(255,255,255,.75)'); R(q[0], CY - gh, 1, gh, 'rgba(255,255,255,.6)'); R(q[0] + q[1] - 1, CY - gh, 1, gh, 'rgba(160,190,210,.6)'); for (var j = 0; j < gh; j += 3) R(q[0] + 2 + j * 0.6, CY - gh + j, 2, 1, 'rgba(255,255,255,.35)'); });
+      /* 화강암 상판 */
+      for (y = CY; y < CY + TT; y++) for (x = 0; x < W; x++) { var g0 = 214 - (y - CY) * 4 + (hs(x, y) * 20 - 10); R(x, y, 1, 1, 'rgb(' + (g0 | 0) + ',' + (g0 - 4 | 0) + ',' + (g0 - 10 | 0) + ')'); }
+      R(0, CY, W, 1, '#f4f2ec'); R(0, CY + TT, W, 1, '#fbfaf6'); R(0, CY + TT + 1, W, 2, '#8a8478');
+      /* 앞판: 나무 세로 홈 · 아래로 갈수록 어둡게 */
+      for (y = FY0; y < H; y++) { var dk = (y - FY0) / (H - FY0); for (x = 0; x < W; x += 1) { var gr = fr(x / 12); var base = gr < 0.08 ? [96, 62, 36] : gr < 0.14 ? [190, 140, 90] : [160, 112, 70]; var l2 = 1 - dk * 0.45; R(x, y, 1, 1, 'rgb(' + (base[0] * l2 | 0) + ',' + (base[1] * l2 | 0) + ',' + (base[2] * l2 | 0) + ')'); } }
+      R(0, FY0, W, 3, 'rgba(30,18,8,.4)');
+      /* 명패 · 서류함 · 펜꽂이 · 호출벨 · 모니터 */
+      var npw = Math.round(W * 0.16), npx = Math.round(W * 0.5 - npw / 2); R(npx, CY - 6, npw, 6, '#2a3a6a'); R(npx, CY - 6, npw, 1, '#5a6aa0'); R(npx + 2, CY - 4, npw - 4, 1, '#e8d080'); R(npx + 4, CY - 2, npw - 8, 1, '#c8c8d8');
+      var tx = Math.round(W * 0.1); for (var j2 = 0; j2 < 3; j2++) { R(tx, CY - 3 - j2 * 3, 18, 2, '#d8d4c8'); R(tx + 1, CY - 4 - j2 * 3, 16, 1, '#fbfbf6'); } R(tx, CY - 1, 18, 1, 'rgba(0,0,0,.2)');
+      var px2 = Math.round(W * 0.3); R(px2, CY - 7, 5, 7, '#4a5a7a'); R(px2 + 1, CY - 11, 1, 4, '#d83a3a'); R(px2 + 3, CY - 10, 1, 3, '#3a6ac0');
+      var bx2 = Math.round(W * 0.7); PXA.ell(c, bx2, CY - 2, 4, 3, '#c8ccd4', CY - 2); R(bx2 - 5, CY - 2, 11, 2, '#5a5a62'); R(bx2 - 1, CY - 6, 2, 1, '#f4f6fa'); R(bx2, CY - 7, 1, 1, '#5a5a62');
+      var mx = Math.round(W * 0.82), mw = Math.round(W * 0.12), mh = Math.round(mw * 0.6); R(mx, CY - mh - 4, mw, mh, '#2a2a30'); R(mx + 1, CY - mh - 3, mw - 2, mh - 2, '#3a3a44'); R(mx + mw / 2 - 1, CY - 4, 3, 4, '#2a2a30'); R(mx + mw / 2 - 4, CY - 1, 9, 1, '#2a2a30');
+    } else {
+      /* 낡은 나무 계산대 */
+      for (y = CY; y < CY + TT; y++) for (x = 0; x < W; x++) { var off = Math.sin(x / 13 + y) * 1.5, gg = fr((y - CY + off) / 2.2); R(x, y, 1, 1, gg < 0.25 ? '#a06a3a' : '#c88a50'); }
+      R(0, CY, W, 1, '#e8b47a'); R(0, CY + TT, W, 1, '#f0c080'); R(0, CY + TT + 1, W, 2, '#5a3418');
+      for (y = FY0; y < H; y++) { var dk2 = (y - FY0) / (H - FY0), row = Math.floor((y - FY0) / 10), pr = fr((y - FY0) / 10); for (x = 0; x < W; x++) { var sh2 = 1 - dk2 * 0.5 + (hs(x >> 3, row) * 0.08 - 0.04); var b2 = pr < 0.1 ? [70, 40, 20] : (row & 1) ? [150, 98, 56] : [138, 90, 50]; R(x, y, 1, 1, 'rgb(' + (b2[0] * sh2 | 0) + ',' + (b2[1] * sh2 | 0) + ',' + (b2[2] * sh2 | 0) + ')'); } }
+      /* 밧줄 장식 */
+      for (x = 0; x < W; x++) R(x, FY0 + 1 + ((x >> 1) % 2), 1, 2, (x >> 1) % 2 ? '#d8c08a' : '#b89a62');
+      /* 지렁이 통 · 태클박스 · 저울 */
+      var wb = Math.round(W * 0.1); R(wb, CY - 9, 12, 9, '#3a8a4a'); R(wb, CY - 9, 12, 1, '#6aba7a'); R(wb + 1, CY - 10, 10, 1, '#5a3a20'); for (var w2 = 0; w2 < 3; w2++) R(wb + 3 + w2 * 3, CY - 11 - (w2 & 1), 2, 1, '#e88a8a');
+      var tb = Math.round(W * 0.26); R(tb, CY - 8, 18, 8, '#c83a2a'); R(tb, CY - 8, 18, 1, '#f06a5a'); R(tb + 7, CY - 10, 4, 2, '#5a2a1a'); R(tb + 1, CY - 4, 16, 1, '#8a2418');
+      var sc = Math.round(W * 0.78); R(sc, CY - 3, 20, 3, '#9aa0a8'); R(sc, CY - 3, 20, 1, '#d0d4da'); R(sc + 8, CY - 8, 4, 5, '#7a8088'); PXA.ell(c, sc + 10, CY - 9, 7, 2, '#c0c6ce');
+      PXA.ell(c, sc + 10, CY - 12, 6, 2, '#5aa0c8'); R(sc + 16, CY - 13, 3, 3, '#5aa0c8'); R(sc + 6, CY - 13, 1, 1, '#1a1a1a');
+    }
+    /* 계산대 앞 명판: 시청 = 남색 판 '민원 접수' · 낚시점 = 나무 판 '달봉이네 낚시' */
+    var pw = Math.max(60, Math.round(Math.min(W * 0.34, 150))), ph = Math.max(14, Math.round(pw * 0.2)), ppx = Math.round(W / 2 - pw / 2), ppy = Math.round(FY0 + Math.min((H - FY0) * 0.1, 18));
+    R(ppx + 2, ppy + 2, pw, ph, 'rgba(0,0,0,.35)');
+    R(ppx - 1, ppy - 1, pw + 2, ph + 2, hall ? '#c8a040' : '#3a2010'); R(ppx, ppy, pw, ph, hall ? '#1c2c6a' : '#c89a5a'); R(ppx, ppy, pw, 1, hall ? '#3a4c9a' : '#e8c080'); R(ppx, ppy + ph - 1, pw, 1, hall ? '#101a48' : '#8a6030');
+    if (!hall) { R(ppx + 2, ppy - 6, 1, 6, '#d8c08a'); R(ppx + pw - 3, ppy - 6, 1, 6, '#d8c08a'); }
+    c.font = 'bold ' + Math.round(ph * 0.62) + 'px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillStyle = hall ? '#0a1030' : '#f4dca8'; c.fillText(hall ? '민원 접수' : '달봉이네 낚시', W / 2 + 1, ppy + ph / 2 + 1);
+    c.fillStyle = hall ? '#f4d070' : '#3a2010'; c.fillText(hall ? '민원 접수' : '달봉이네 낚시', W / 2, ppy + ph / 2);
+    /* 계산대 그림자 · 아래로 어둡게 */
+    for (y = CY - 4; y < CY; y++) { c.fillStyle = 'rgba(20,10,0,' + (0.04 * (y - CY + 5)).toFixed(2) + ')'; c.fillRect(0, y, W, 1); }
+    G.TT = TT; return G;
+  }
+  /* 움직이는 것: 시청 = 번호표 · 시계 바늘 · 먼지 / 낚시점 = 창밖 파도 · 갈매기 · 수조 물고기 · 거품 */
+  var DIG3 = ['111101101101111', '010110010010111', '111001111100111', '111001111001111', '101101111001001', '111100111001111', '111100111101111', '111001001001001', '111101111101111', '111101111001111'];
+  function npcAnim(c, G, tk) {
+    var R = function (x, y, w, h, col) { c.fillStyle = col; c.fillRect(Math.round(x), Math.round(y), w, h); }, i, x, y;
+    if (NPC.k === 'hall') {
+      var d = G.disp, num = 100 + Math.floor(tk / 60) % 900, s = String(num).padStart(4, '0'), sc = Math.max(1, Math.floor(d[3] / 7)), flash = tk % 60 < 6 && tk % 2;
+      for (i = 0; i < 4; i++) { var dg = DIG3[+s[i]]; for (var j = 0; j < 15; j++) if (dg[j] === '1') R(d[0] + 2 + i * (d[2] - 4) / 4 + (j % 3) * sc, d[1] + (d[3] - 5 * sc) / 2 + ((j / 3) | 0) * sc, sc, sc, flash ? '#ffeaa0' : '#ff4a2a'); }
+      var cl = G.clock, now = new Date(), hh = (now.getHours() % 12 + now.getMinutes() / 60) / 12 * Math.PI * 2, mm = (now.getMinutes() + now.getSeconds() / 60) / 60 * Math.PI * 2, ss = now.getSeconds() / 60 * Math.PI * 2;
+      function hand(a, len, wdt, col) { for (var q = -1; q <= len; q += 0.5) { var hx = Math.round(cl[0] + Math.sin(a) * q), hy = Math.round(cl[1] - Math.cos(a) * q); R(hx - (wdt > 1 ? 1 : 0), hy - (wdt > 1 ? 1 : 0), wdt, wdt, col); } }
+      hand(hh, cl[2] * 0.5, cl[2] >= 14 ? 3 : 2, '#1e1e24'); hand(mm, cl[2] * 0.78, cl[2] >= 14 ? 2 : 1, '#2a2a30'); hand(ss, cl[2] * 0.86, 1, '#d83a3a'); R(cl[0] - 1, cl[1] - 1, 3, 3, '#d83a3a'); R(cl[0], cl[1], 1, 1, '#ffd0a0');
+      for (i = 0; i < 12; i++) { var span = G.CY - G.by1, yy = G.by1 + ((PXA.hs(i, 31) * span + tk * 0.3) % span), xx = G.bx0 * 0.3 + PXA.hs(i, 32) * G.bx0 * 0.9 + (yy - G.by1) * 0.5 + Math.sin(tk / 8 + i) * 2; R(xx, yy, 1, 1, 'rgba(255,250,220,.7)'); }
+    } else {
+      var w = G.win, hz = w[1] + Math.round(w[3] * 0.5);
+      c.save(); c.beginPath(); c.rect(w[0], w[1], w[2], w[3]); c.clip();
+      R(w[0], w[1], w[2], hz - w[1], '#8ad0f4'); R(w[0], w[1], w[2], Math.round((hz - w[1]) * 0.4), '#b8e4fa');
+      PXA.cloud(c, w[0] + ((tk * 0.2) % (w[2] + 20)) - 10, w[1] + 4, 1, '#ffffff', '#dff2fc');
+      for (y = hz; y < w[1] + w[3]; y++) for (x = w[0]; x < w[0] + w[2]; x++) { var wv2 = Math.sin(x * 0.5 + tk * 0.4 + y * 1.3); R(x, y, 1, 1, wv2 > 0.85 ? '#e8f8ff' : y - hz < 2 ? '#3a90c8' : '#2a78b0'); }
+      var bxp = w[0] + ((tk * 0.15) % (w[2] + 16)) - 8, byp = hz - 1 + Math.round(Math.sin(tk / 5));
+      if (bxp > w[0] - 6 && bxp < w[0] + w[2]) { R(bxp, byp, 8, 2, '#e8e4dc'); R(bxp + 1, byp + 2, 6, 1, '#c84a3a'); R(bxp + 3, byp - 5, 1, 5, '#5a3a20'); R(bxp + 4, byp - 5, 3, 4, '#fbfbf6'); }
+      var gx = w[0] + w[2] * 0.3 + Math.sin(tk / 12) * w[2] * 0.2, gy = w[1] + w[3] * 0.25 + Math.cos(tk / 9) * 2, fl = tk % 6 < 3; R(gx - 2, gy - (fl ? 1 : 0), 2, 1, '#fff'); R(gx, gy, 1, 1, '#fff'); R(gx + 1, gy - (fl ? 1 : 0), 2, 1, '#fff');
+      c.restore();
+      /* 창틀 */
+      R(w[0] + w[2] / 2 - 1, w[1], 2, w[3], '#4a2c16'); R(w[0], w[1] + w[3] / 2 - 1, w[2], 2, '#4a2c16'); R(w[0] + 1, w[1] + 1, 1, w[3] - 2, 'rgba(255,255,255,.35)');
+      /* 오른벽 수조 안: 물고기 · 거품 (원근 좌표로 위치 계산) */
+      for (i = 0; i < 5; i++) {
+        var fq = 0.25 + ((PXA.hs(i, 51) * 0.5 + tk * 0.003 * (i % 2 ? 1 : -1)) % 0.5 + 0.5) % 0.5, tt2 = 1 / (fq * (1 - G.iT) + G.iT), xx2 = G.VX + (G.bx1 - G.VX) * tt2; if (xx2 >= G.W - 1) continue;
+        var top2 = G.VY + tt2 * (G.by0 - G.VY), bot2 = G.VY + tt2 * (G.by1 - G.VY), wv3 = 0.38 + PXA.hs(i, 52) * 0.2, yy2 = top2 + (bot2 - top2) * wv3 + Math.sin(tk / 6 + i) * 1, fs = Math.max(2, Math.round(tt2 * 1.5));
+        PXA.ell(c, xx2, yy2, fs, Math.max(1, fs >> 1), ['#f8a040', '#f4e04a', '#e86a6a', '#8ae0f0', '#f4f0e0'][i]); R(xx2 + (i % 2 ? -fs - 1 : fs), yy2 - 1, 1, 3, ['#d88020', '#d4c02a', '#c84a4a', '#5ac0d0', '#c8c4b8'][i]);
+        var by3 = bot2 - ((tk * 0.6 + i * 7) % ((bot2 - top2) * 0.32)) - (bot2 - top2) * 0.32; R(xx2 + 2, by3, 1, 1, 'rgba(255,255,255,.8)');
+      }
+    }
+  }
+  /* 초상 (64x56) — 라떼(catPortrait)와 같은 틀: 작고 동그란 몸 · 동글동글 큰 머리 + 양 볼 · 이마 빛 · 통통한 흰 볼·턱 · 큰 반짝 눈 · 작은 코 · ω 입 */
+  function cuteFace(cx, P, emo, talk, blink) {
+    function R(x, y, w, h, c) { cx.fillStyle = c; cx.fillRect(x, y, w, h); }
+    function ell(x, y, rx, ry, c, y0, y1) { for (var dy = -ry; dy <= ry; dy++) { var yy = y + dy; if (yy < (y0 || 0) || yy > (y1 === undefined ? 55 : y1)) continue; var w = Math.round(rx * Math.sqrt(Math.max(0, 1 - (dy * dy) / (ry * ry)))); R(x - w, yy, w * 2 + 1, 1, c); } }
+    var i, y, OL = P.ol, BK = P.fur, droop = emo === 'w', closed = emo === 'h' || blink, big = emo === 's';
+    cx.clearRect(0, 0, 64, 56);
+    /* 작고 동그란 몸 (옷은 P.body 가 그린다) */
+    ell(32, 58, 25, 21, OL); ell(32, 58, 24, 20, P.cloth); P.body(R, ell);
+    /* 귀 (머리 뒤) */
+    P.ears(R, ell, droop);
+    /* 동그란 머리 + 양 볼 */
+    ell(32, 27, 22, 17, OL); ell(17, 31, 7, 7, OL); ell(47, 31, 7, 7, OL); ell(32, 27, 21, 16, BK); ell(17, 31, 6, 6, BK); ell(47, 31, 6, 6, BK);
+    ell(29, 19, 13, 5, P.hi, 12, 22); R(22, 15, 4, 1, P.hi2); R(20, 16, 3, 1, P.hi2);   /* 이마 빛 */
+    ell(32, 38, 20, 6, P.sh, 38, 44); ell(32, 27, 21, 16, BK, 0, 37);   /* 턱 아래 그늘 */
+    /* 이마 줄 + 통통한 흰 볼 · 턱 */
+    if (P.blaze) for (y = 16; y < 30; y++) { var bw = Math.max(0, Math.round((y - 16) * 0.4)); R(32 - bw, y, bw * 2 + 1, 1, P.wt); }
+    ell(32, 35, 14, 8, P.wt, 28, 43); ell(23, 37, 5, 3, P.wt, 33, 41); ell(41, 37, 5, 3, P.wt, 33, 41); ell(32, 40, 10, 4, P.wt, 38, 44); ell(32, 42, 8, 2, P.ws, 42, 44);
+    /* 큰 반짝 눈 */
+    [22, 42].forEach(function (ex) {
+      if (closed) { for (i = -4; i <= 4; i++) { var ay = 28 - Math.min(3, 4 - Math.abs(i)); R(ex + i, ay, 1, 2, P.lid); } return; }
+      var ry = big ? 6 : 5, rx = big ? 5 : 4, cy = 26;
+      ell(ex, cy, rx + 1, ry + 1, OL); ell(ex, cy, rx, ry, P.iris); ell(ex, cy + 2, rx, ry - 2, P.iris2, cy + 1);
+      ell(ex, cy + 1, big ? 4 : 3, ry, '#14141c');
+      R(ex - 2, cy - 3, 3, 3, '#ffffff'); R(ex + 1, cy + 2, 2, 2, '#ffffff');
+      if (droop) { var d = ex < 32 ? 1 : -1; for (i = 0; i < 6; i++) R(ex - 3 + i, cy - ry - 3 + (d > 0 ? (i >> 1) : 2 - (i >> 1)), 1, 1, OL); }
+    });
+    /* 코 */
+    P.nose(R, ell);
+    /* 입: 말할 때 · 웃을 때 열린 입, 놀라면 o, 걱정하면 ~, 평소 ω */
+    var M = P.mouth;
+    if (talk || emo === 'h') { var oh = talk ? 3 : 2; ell(32, 37, 3, oh, M, 35, 37 + oh); ell(32, 38, 2, Math.max(1, oh - 1), '#f07888', 37, 37 + oh); R(30, 35, 5, 1, M); }
+    else if (big) { R(31, 37, 3, 3, M); R(32, 38, 1, 1, '#f07888'); }
+    else if (droop) { R(29, 37, 2, 1, M); R(31, 36, 2, 1, M); R(33, 37, 2, 1, M); }
+    else { R(32, 35, 1, 1, M); R(30, 36, 2, 1, M); R(33, 36, 2, 1, M); R(29, 35, 1, 1, M); R(35, 35, 1, 1, M); }
+    /* 볼 분홍빛 */
+    R(13, 33, 4, 1, P.blush); R(47, 33, 4, 1, P.blush); R(14, 34, 2, 1, P.blush); R(48, 34, 2, 1, P.blush);
+    if (P.extra) P.extra(R, ell, emo);
+  }
+  /* 누리 주무관: 진돗개(황구) · 쫑긋 선 세모 귀 · 하얀 볼·주둥이·가슴 · 까만 코 · 남색 조끼 + 흰 셔츠 + 빨간 넥타이 + 사원증 */
+  var DOG_P = {
+    ol: '#3e2414', fur: '#dc9c5c', hi: '#e8b070', hi2: '#f4c88c', sh: '#b87a40', wt: '#fffaf0', ws: '#efe2cc', lid: '#5a3218',
+    iris: '#7a4a24', iris2: '#5a3416', mouth: '#5a3218', blush: '#f4a0a0', cloth: '#2c3e7a', blaze: true,
+    body: function (R, ell) {
+      ell(32, 57, 11, 17, '#fbfbf6', 38, 55); R(22, 40, 1, 15, '#3a54a0'); R(42, 40, 1, 15, '#3a54a0');
+      R(31, 43, 3, 12, '#d03a3a'); R(30, 42, 5, 3, '#e85050'); R(32, 47, 1, 7, '#a82a2a');   /* 넥타이 */
+      R(23, 44, 1, 10, '#4a8ae0'); R(40, 44, 1, 7, '#4a8ae0'); R(37, 50, 8, 6, '#ffffff'); R(37, 50, 8, 2, '#4a8ae0'); R(38, 53, 2, 2, '#dc9c5c'); R(41, 53, 3, 1, '#8a8a9a');   /* 사원증 */
+      R(16, 47, 3, 1, '#4a5ca8'); R(46, 47, 3, 1, '#4a5ca8');
+    },
+    /* 진돗개 귀: 두툼한 세모가 위로 쫑긋 (끝은 살짝 앞으로) · 안쪽 크림색. 걱정하면 뒤로 눕는다 */
+    ears: function (R, ell, droop) {
+      [[1, 13], [-1, 51]].forEach(function (q) {
+        var d = q[0], bx = q[1], ty = droop ? 8 : 1, out = droop ? 4 : 0;
+        for (var y = ty; y <= 20; y++) {
+          var t = (y - ty) / (20 - ty), w = Math.max(1, Math.round(1 + t * 12)), tip = Math.round((1 - t) * (5 + out)), x0 = d > 0 ? bx + tip - Math.round(t * 2) : bx - w + 1 - tip + Math.round(t * 2);
+          R(x0 - 1, y, w + 2, 1, '#3e2414'); R(x0, y, w, 1, y < ty + 3 ? '#c4844a' : '#dc9c5c');
+          if (y > ty + 4) { var iw = Math.max(1, w - 7); R(d > 0 ? x0 + 3 : x0 + w - 3 - iw, y, iw, 1, '#f6dcb4'); if (iw > 2) R(d > 0 ? x0 + 3 : x0 + w - 4, y, 1, 1, '#e8bf8c'); }
+        }
+      });
+    },
+    nose: function (R, ell) { ell(32, 32, 3, 2, '#2a1a12'); R(31, 31, 2, 1, '#7a6a6a'); R(32, 34, 1, 1, '#5a3218'); }
+  };
+  /* 달봉 사장: 갈색 수달 · 작고 둥근 귀 · 크림색 볼 · 하얀 수염 · 올리브 벙거지 모자 · 주머니 많은 낚시 조끼 */
+  var OTTER_P = {
+    ol: '#2a1a10', fur: '#94643e', hi: '#a87650', hi2: '#c08c62', sh: '#74482a', wt: '#f2e0c0', ws: '#dcc8a4', lid: '#2a1a10',
+    iris: '#4a3018', iris2: '#2e1c0c', mouth: '#4a2c18', blush: '#e89a8a', cloth: '#3a6a9a', blaze: false,
+    body: function (R, ell) {
+      for (var y = 40; y < 56; y++) for (var x = 9; x < 56; x++) { var w0 = Math.round(24 * Math.sqrt(Math.max(0, 1 - Math.pow((y - 58) / 20, 2)))); if (Math.abs(x - 32) <= w0 && ((x >> 2) + (y >> 2)) % 2 === 0) R(x, y, 1, 1, '#4a7cae'); }
+      [[9, 25], [39, 56]].forEach(function (q) { for (var yy = 39; yy < 56; yy++) { var w1 = Math.round(24 * Math.sqrt(Math.max(0, 1 - Math.pow((yy - 58) / 20, 2)))), a = Math.max(q[0], 32 - w1), b = Math.min(q[1], 32 + w1); if (b > a) R(a, yy, b - a, 1, yy === 39 ? '#d4bc80' : '#b8a060'); } });
+      R(25, 40, 1, 16, '#8a7640'); R(39, 40, 1, 16, '#8a7640');
+      R(14, 46, 7, 6, '#a08848'); R(14, 46, 7, 1, '#d0b878'); R(43, 46, 7, 6, '#a08848'); R(43, 46, 7, 1, '#d0b878'); R(17, 43, 1, 3, '#e85a2a'); R(16, 43, 3, 1, '#f4d040');
+    },
+    ears: function (R, ell) { ell(14, 16, 5, 5, '#2a1a10'); ell(14, 16, 4, 4, '#7a5030'); ell(14, 17, 2, 2, '#c09070'); ell(50, 16, 5, 5, '#2a1a10'); ell(50, 16, 4, 4, '#7a5030'); ell(50, 17, 2, 2, '#c09070'); },
+    nose: function (R, ell) { ell(32, 32, 4, 2, '#2a1a10'); R(30, 31, 3, 1, '#6a5a5a'); R(32, 34, 1, 1, '#4a2c18'); },
+    extra: function (R, ell, emo) {
+      /* 수염 */
+      [-1, 1].forEach(function (j) { R(4, 35 + j * 2, 10, 1, 'rgba(255,255,255,.75)'); R(50, 35 + j * 2, 10, 1, 'rgba(255,255,255,.75)'); });
+      /* 벙거지 모자 (머리 위에 얹는다) */
+      ell(32, 12, 25, 4, '#2a1a10', 8, 16); ell(32, 12, 24, 3, '#4e5a28', 8, 15); ell(32, 11, 24, 2, '#6a7a3a', 8, 12);
+      ell(32, 8, 15, 8, '#2a1a10', 0, 12); ell(32, 8, 14, 7, '#6a7a3a', 0, 12); ell(29, 5, 8, 3, '#808e4a', 0, 7);
+      R(18, 10, 28, 2, '#8a5a30'); R(18, 10, 28, 1, '#a87444'); R(41, 9, 3, 3, '#e8c040'); R(42, 9, 1, 1, '#fff4a0');
+    }
+  };
+  function dogPortrait(cx, emo, talk, blink) { cuteFace(cx, DOG_P, emo, talk, blink); }
+  function otterPortrait(cx, emo, talk, blink) { cuteFace(cx, OTTER_P, emo, talk, blink); }
   function hallAt(c) { var i = vHouseAt(c); return i >= 0 && VHS[i].n === '시청'; }
   /* 마을 안 [입장]으로 여는 건물 문: 'hall' 시청(주민센터) · 'fish' 낚시점 */
   function doorKind(c) { var i = vHouseAt(c); if (i < 0) return ''; var n = VHS[i].n; return n === '시청' ? 'hall' : n === '낚시점' ? 'fish' : ''; }
-  function enterDoor(c) { var k = doorKind(c); if (k === 'hall') openHallWin(); else if (k === 'fish') openFishShop(); }
+  function enterDoor(c) { var k = doorKind(c); if (k) npcOpen(k); }   /* v131: 메뉴 창 대신 대화 화면 (예전 창 openHallWin · openFishShop 은 그대로 둔다) */
   /* 시청(주민센터) 창 — 낚시점과 같은 창(#furnPicker). 기능은 HALL_MENU 에 하나씩 더하면 된다
      { id, ic: 아이콘(AIC), n: 이름, lines(): 설명 줄들, ok(): 지금 쓸 수 있나, act: 버튼 글자, run(): 실행 } */
   var HALL_MENU = [
